@@ -1,54 +1,50 @@
 # nokta-hoop
 
-`nokta-hoop`, Nokta fikir kuluçka akışına insan döngüsü yönetişimi,
-gerçek zamanlı danışmanlık ve transkript tabanlı bilgi geri yazımı ekleyen
-bir orkestrasyon katmanıdır.
+`nokta-hoop`, Nokta fikir geliştirme akışına AI destekli Mascot, insan
+mentor/uzman devri, gerçek zamanlı video görüşme ve transkript tabanlı bilgi
+geri yazımı ekleyen bir orkestrasyon katmanıdır.
 
-Bu proje yalnızca bir video görüşme uygulaması değildir. Uzun vadeli hedef,
-Nokta içindeki fikirlerin yapılandırılmış insan değerlendirmesinden geçmesini
-sağlamaktır: öğrenci, kurucu, mentor veya uzman gerçek zamanlı görüşebilir;
-görüşme transkript olarak kaydedilir; bu insan geri bildirimi daha sonra karar
-kayıtlarına, wiki hafızasına ve sonraki fikir iterasyonlarına aktarılabilir.
+Bu proje yalnızca bir video görüşme uygulaması değildir. Amaç, kullanıcının
+Mascot ile konuşurken gerektiği noktada bir insana bağlanabilmesi, görüşmenin
+transkript olarak yakalanması ve bu insan bilgisinin sonraki konuşma bağlamına
+geri dönebilmesidir.
 
-Bu repodaki ilk çalışan parça, gerçek zamanlı danışmanlık katmanıdır:
-Stream Video ile çalışan Android development build, otomatik transkript alma
-ve transkripti dışa aktarma akışı.
+## Mevcut Ürün Akışı
 
-## Proje Amacı
+Şu an çalışan MVP akışı:
 
-Nokta tarafında fikir gelişimi çoğunlukla asenkron bir artifact akışı olarak
-ilerler: fikir belgeye, spece, pull request'e veya değerlendirme hedefine
-dönüşür. `nokta-hoop`, bu akışın etrafına eksik olan insan etkileşimi
-katmanını ekler.
+1. Kullanıcı mobil uygulamada Nokta Mascot ile konuşur.
+2. Mascot cevap üretir veya konunun uzman gerektirip gerektirmediğine karar
+   verir.
+3. Kullanıcı açıkça uzman/mentor isterse mentor isteği hemen oluşturulur.
+4. Konu uzmanlık gerektiriyorsa Mascot önce kullanıcıdan onay ister.
+5. Mentor, uygulamadaki mentor kuyruğundan isteği kabul eder.
+6. Kabul sonrası Mascot gizlenir ve Stream Video görüşmesi açılır.
+7. Taraflardan biri görüşmeyi bitirince görüşme herkes için kapanır.
+8. Stream transcript hazırlanır.
+9. Transcript hazır olunca Mascot konuşmasına geri eklenir.
+10. Transcript uygulama içinde okunabilir ve MD, TXT veya JSON olarak dışa
+    aktarılabilir.
 
-Hedeflenen ürün yönü:
+Konuşma olmayan görüşmelerde transcript bekleme sonsuza kadar sürmez; uygulama
+görüşmeyi tamamlanmış kabul eder ve “konuşma algılanmadı” mesajı gösterir.
 
-- Riskli veya önemli kararlar için HITL/HOTL/HOOTL yönetişim akışları.
-- Mentor/uzman ile gerçek zamanlı video veya sesli danışmanlık.
-- Görüşme transkriptlerinin kalıcı proje kanıtı olarak saklanması.
-- Transkriptlerin wiki, hafıza, karar logları veya RAG benzeri bilgi katmanına
-  geri yazılması.
-- İleride yapılandırılmış insan değerlendirmesi için policy ve escalation
-  adapter'ları.
-- Uygun yerlerde AI/avatar destekli danışmanlık akışları.
-
-## Mevcut Uygulama
-
-Şu anki kod tek bir çalışan MVP'ye odaklanır:
+## Özellikler
 
 - Android Expo dev-client mobil uygulaması.
-- Stream Video oda katılım akışı.
-- Dinamik guest kullanıcılar.
-- Lokal Stream token server.
-- Görüşme başladığında otomatik transkripsiyon başlatma.
-- Görüşme bittiğinde transkripsiyonu durdurma ve transkripti bekleme.
-- Kullanıcının beklemesi gerektiğini gösteren transcript loading durumu.
-- Transkript okuma ekranı.
-- Transkripti Markdown, düz metin veya JSON olarak dışa aktarma.
-
-Bu parça, daha büyük Hoop iş akışının temelidir: önce insan görüşmesini
-güvenilir biçimde yakalamak, sonra bu transkripti yönetişim ve writeback
-özelliklerine bağlamak.
+- 3D Nokta Mascot ekranı.
+- Yazılı ve sesli kullanıcı girişi.
+- Cihaz TTS motoru ile Mascot sesli cevapları.
+- Opsiyonel Groq destekli Mascot cevapları.
+- Groq yoksa deterministic fallback karar motoru.
+- Uzmanlık sinyallerinde mentor yönlendirme kararı.
+- Uzmanlık önerisi için kullanıcı onayı.
+- Mentor istek kuyruğu.
+- Mentor kabul edince Stream Video handoff.
+- Görüşme sonlandığında iki tarafın da görüşmeden çıkması.
+- Stream transcription başlatma/durdurma.
+- Transcript polling, okuma ekranı ve export.
+- Chat sıfırlama.
 
 ## Repo Yapısı
 
@@ -57,33 +53,44 @@ nokta-hoop/
 |-- apps/
 |   `-- mobile/              # Expo React Native dev-client uygulaması
 |-- packages/
-|   `-- hoop-call/           # Görüşme ID ve transkript yardımcıları
+|   |-- hoop-call/           # Stream call ID, transcript parse/format yardımcıları
+|   `-- hoop-core/           # Mascot, escalation ve transcript dönüş domain mantığı
 |-- services/
-|   `-- token-server/        # Stream token, transcript ve export backend'i
-|-- DEVELOPER_SETUP.md       # Android geliştirici kurulum rehberi
+|   `-- token-server/        # Stream token, Mascot decision, escalation ve transcript API
+|-- DEVELOPER_SETUP.md       # Yeni geliştirici Android kurulum rehberi
 |-- CHANGELOG.md             # Sürümlendirilmiş değişiklik günlüğü
 |-- AGENT.md                 # Ajan çalışma kuralları
 |-- DESIGN.md                # Tasarım yönü
-|-- IDEA.md                  # Tam ürün ve mimari fikri
-`-- PLAN.md                  # İlk repo planı
+|-- IDEA.md                  # Ürün fikri
+`-- PLAN.md                  # Repo planı
 ```
 
 `example/`, `node_modules/`, lokal `.env` dosyaları ve generated build çıktıları
 Git dışında bırakılır.
 
-## MVP Nasıl Çalışır?
+## Temel Mimari
 
-1. Mobil uygulama `services/token-server` servisinden Stream user token ister.
-2. Token server, Stream API secret ile token üretir.
-3. Kullanıcı Stream Video odasına katılır.
-4. Uygulama görüşme için Stream transkripsiyonunu başlatır.
-5. Kullanıcı görüşmeyi bitirdiğinde transkripsiyon durdurulur.
-6. Transcript ekranı hemen açılır ve işlem sürüyorsa loading durumu gösterir.
-7. Mobil uygulama, Stream transcription asset hazır olana kadar token server'ı
-   yoklar.
-8. `packages/hoop-call` transkripti parse eder ve formatlar.
-9. Transkript uygulama içinde okunabilir veya MD, TXT, JSON olarak dışa
-   aktarılabilir.
+Mobil uygulama doğrudan Stream secret veya Groq key taşımaz. Bunlar
+`services/token-server` içinde tutulur.
+
+```text
+Mobile app
+  -> token-server /mascot/decide
+  -> token-server /escalations
+  -> token-server /token
+  -> Stream Video SDK
+  -> token-server /calls/:type/:id/transcript
+```
+
+`token-server` şu işleri yapar:
+
+- Stream user token üretir.
+- Mascot karar endpoint’ini sunar.
+- Groq varsa AI cevap/karar üretir.
+- Groq yoksa `hoop-core` deterministic karar motorunu kullanır.
+- Mentor escalation isteklerini bellekte tutar.
+- Stream transcript asset’lerini alır, parse eder ve export eder.
+- Görüşmeyi herkes için sonlandıran Stream call end endpoint’ini proxy eder.
 
 ## Gereksinimler
 
@@ -92,12 +99,13 @@ Git dışında bırakılır.
 - Android Studio ve Android SDK
 - Java JDK 17
 - Stream Video API key ve secret
-- Stream uygulamasında veya call type tarafında transcription özelliği
-- Fiziksel telefon testi için gerektiğinde Cloudflare Tunnel client
+- Stream Video transcription özelliği
+- Cloudflare Tunnel client (`cloudflared`)
 - Nokta Hoop Android dev-client APK
+- Opsiyonel: Groq API key
 
-Uygulama Expo Go içinde çalışmaz. Stream Video native WebRTC modülleri
-kullandığı için projeye özel dev-client APK gerekir.
+Uygulama Expo Go içinde çalışmaz. Stream Video native WebRTC modülleri kullandığı
+için özel dev-client APK gerekir.
 
 ## Ortam Dosyaları
 
@@ -117,6 +125,8 @@ STREAM_API_KEY=your_stream_api_key
 STREAM_API_SECRET=your_stream_api_secret
 ALLOWED_ORIGINS=*
 STREAM_TRANSCRIPTION_LANGUAGE=tr
+GROQ_API_KEY=optional_groq_api_key
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 `apps/mobile/.env`:
@@ -128,7 +138,7 @@ EXPO_PUBLIC_STREAM_ENABLE_TRANSCRIPTION=true
 EXPO_PUBLIC_STREAM_TRANSCRIPTION_LANGUAGE=tr
 ```
 
-Gerçek Stream secret değerleri commit edilmemelidir.
+Gerçek secret, API key ve lokal `.env` dosyaları commit edilmemelidir.
 
 ## Kurulum
 
@@ -138,49 +148,50 @@ npm install
 
 ## Çalıştırma
 
-Token server'ı başlat:
+Token server:
 
 ```powershell
 npm run server:dev
 ```
 
-Telefon testi için token server'ı dışarı aç:
+Telefon testi için token server’ı dışarı aç:
 
 ```powershell
 cloudflared tunnel --url http://127.0.0.1:8787
 ```
 
-Cloudflare'ın ürettiği URL'yi `apps/mobile/.env` içindeki
-`EXPO_PUBLIC_TOKEN_SERVER_URL` değerine yaz, sonra Metro'yu yeniden başlat.
+Cloudflare’ın verdiği URL’yi `apps/mobile/.env` içindeki
+`EXPO_PUBLIC_TOKEN_SERVER_URL` değerine yaz ve Metro’yu yeniden başlat.
 
-Metro'yu başlat:
+Metro:
 
 ```powershell
 npm run mobile:start -- --clear
 ```
 
-Gerekirse Android dev-client build al:
+Android dev-client build:
 
 ```powershell
 npm run mobile:android
 ```
 
-Oluşan debug APK genellikle buradadır:
+Debug APK genellikle burada oluşur:
 
 ```text
 apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Detaylı Android kurulum adımları `DEVELOPER_SETUP.md` içinde yer alır.
+Detaylı Android ve telefonda test adımları için `DEVELOPER_SETUP.md` dosyasını
+kullan.
 
 ## Komutlar
 
 ```powershell
-npm run server:dev       # Token/transcript backend'ini başlatır
-npm run mobile:start     # Expo Metro'yu başlatır
-npm run mobile:android   # Android dev-client build/install yapar
-npm run typecheck        # Aktif workspace'leri typecheck eder
-npm run test             # Paket testlerini çalıştırır
+npm run server:dev       # Token/Mascot/escalation/transcript backend'i
+npm run mobile:start     # Expo Metro
+npm run mobile:android   # Android dev-client build/install
+npm run typecheck        # Tüm workspace typecheck
+npm run test             # Paket testleri
 ```
 
 ## Token Server API
@@ -189,28 +200,51 @@ npm run test             # Paket testlerini çalıştırır
 GET  /health
 GET  /users
 POST /token
+
+POST /mascot/decide
+
+GET  /escalations
+POST /escalations
+GET  /escalations/:id
+POST /escalations/:id/accept
+POST /escalations/:id/resolve
+
+POST /calls/:callType/:callId/end
 GET  /calls/:callType/:callId/transcriptions
 GET  /calls/:callType/:callId/transcript
 GET  /calls/:callType/:callId/export?format=md|txt|json
 ```
 
+## Uzman Yönlendirme Mantığı
+
+Mascot iki farklı davranış gösterir:
+
+- Kullanıcı açıkça “uzman iste”, “mentor bağla” gibi bir şey söylerse mentor
+  isteği doğrudan oluşturulur.
+- Konu uzmanlık gerektiriyorsa Mascot önce kullanıcıdan onay ister.
+
+Uzmanlık sinyalleri arasında hukuk, sağlık, finans, yatırım, pazar doğrulaması,
+regülasyon, güvenlik, teknik doğrulama, algoritmalar, veri yapıları, çizge,
+Hamilton döngüsü ve benzeri konular bulunur.
+
 ## Kapsam
 
-Şu an implement edilenler:
+Şu an implement edilen ana kapsam:
 
-- Android Stream Video görüşme akışı.
-- Token backend.
-- Transkript alma ve parse etme.
-- Transkript dışa aktarma.
+- Mascot tabanlı sohbet.
+- Opsiyonel AI cevapları.
+- Mentor escalation ve kabul akışı.
+- Stream Video görüşme handoff.
+- Görüşme transcript’i ve export.
 
-Daha büyük `nokta-hoop` fikrinde planlananlar:
+Daha büyük `nokta-hoop` fikrinde ileride planlananlar:
 
-- Hoop policy ve runtime orkestrasyonu.
-- HITL/HOTL/HOOTL escalation akışları.
-- Slack, WhatsApp veya email gibi adapter kanalları.
-- Transkriptin wiki'ye geri yazılması.
-- Bilgi hafızası ve karar logları.
-- AI/avatar destekli danışmanlık.
+- Kalıcı escalation storage.
+- Mentor bildirimleri.
+- Wiki/writeback entegrasyonu.
+- Policy tabanlı HITL/HOTL/HOOTL akışları.
+- Slack, WhatsApp, email gibi adapter kanalları.
+- Transcript özetleme ve bilgi hafızasına yazma.
 
 ## Doğrulama
 

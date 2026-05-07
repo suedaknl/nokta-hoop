@@ -2,6 +2,14 @@ import 'dotenv/config';
 
 import cors from 'cors';
 import express from 'express';
+import {
+  buildExpertInviteText,
+  createEscalationRequest,
+  type EscalationParticipant,
+  type EscalationRequest,
+  type EscalationStatus,
+  type MascotChatMessage,
+} from '@nokta-hoop/hoop-core';
 import { StreamClient } from '@stream-io/node-sdk';
 import {
   extractTranscriptionAssets,
@@ -16,6 +24,7 @@ import {
 } from '@nokta-hoop/hoop-call';
 
 import { DEMO_USERS, getDemoUser } from './demoUsers.ts';
+import { decideMascotActionWithAi } from './mascotAi.ts';
 
 type HealthResponse = {
   status: 'ok';
@@ -37,6 +46,7 @@ type TokenResponse = {
 };
 
 type StreamVideoCall = {
+  end: () => Promise<unknown>;
   listTranscriptions: () => Promise<unknown>;
 };
 
@@ -45,6 +55,23 @@ type StreamVideoFacade = {
 };
 
 type TranscriptExportFormat = 'json' | 'md' | 'txt';
+
+type CreateEscalationRequestBody = {
+  requester_id?: string;
+  requester_name?: string;
+  topic?: string;
+  question?: string;
+};
+
+type AcceptEscalationRequestBody = {
+  expert_id?: string;
+  expert_name?: string;
+};
+
+type MascotDecisionRequestBody = {
+  message?: string;
+  history?: MascotChatMessage[];
+};
 
 class TranscriptPendingError extends Error {
   constructor(message = 'Transcript is not ready yet.') {
@@ -63,6 +90,7 @@ const transcriptionLanguage = process.env.STREAM_TRANSCRIPTION_LANGUAGE ?? 'tr';
 
 const streamClient =
   apiKey && apiSecret ? new StreamClient(apiKey, apiSecret) : null;
+const escalations = new Map<string, EscalationRequest>();
 
 const corsOrigins =
   allowedOrigins === '*' || allowedOrigins.trim() === ''
@@ -81,6 +109,8 @@ app.get('/', (_req, res) => {
     health: '/health',
     token: '/token',
     users: '/users',
+    mascotDecision: '/mascot/decide',
+    escalations: '/escalations',
     transcript: '/calls/default/{callId}/transcript',
     export: '/calls/default/{callId}/export?format=md',
   });
@@ -103,6 +133,143 @@ app.get('/users', (_req, res) => {
       nameLength: '2-80',
     },
   });
+});
+
+app.post('/mascot/decide', async (req, res) => {
+  const body = req.body as MascotDecisionRequestBody;
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+
+  if (message.length < 2) {
+    res.status(400).json({ error: 'Invalid message.' });
+    return;
+  }
+
+  const decision = await decideMascotActionWithAi({
+    message,
+    history: Array.isArray(body.history) ? body.history.slice(-12) : undefined,
+  });
+
+  res.json({ decision });
+});
+
+app.get('/escalations', (req, res) => {
+  const status = getEscalationStatus(req.query.status);
+  let items = [...escalations.values()].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
+
+  if (status) {
+    items = items.filter((request) => request.status === status);
+  }
+
+  res.json({ escalations: items });
+});
+
+app.post('/escalations', (req, res) => {
+  const body = req.body as CreateEscalationRequestBody;
+  const requester = getRequestParticipant(
+    body.requester_id,
+    body.requester_name,
+  );
+  const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
+  const question =
+    typeof body.question === 'string' ? body.question.trim() : '';
+
+  if (!requester) {
+    res.status(400).json({
+      error:
+        'Invalid requester. Send requester_id and requester_name with valid values.',
+    });
+    return;
+  }
+
+  if (topic.length < 2 || question.length < 4) {
+    res.status(400).json({
+      error: 'Invalid escalation. Send topic and question.',
+    });
+    return;
+  }
+
+  const request = createEscalationRequest({
+    requester,
+    topic,
+    question,
+  });
+  escalations.set(request.id, request);
+
+  res.status(201).json({
+    escalation: request,
+    inviteText: buildExpertInviteText(request),
+  });
+});
+
+app.get('/escalations/:id', (req, res) => {
+  const request = escalations.get(req.params.id);
+  if (!request) {
+    res.status(404).json({ error: 'Escalation not found.' });
+    return;
+  }
+
+  res.json({ escalation: request, inviteText: buildExpertInviteText(request) });
+});
+
+app.post('/escalations/:id/accept', (req, res) => {
+  const request = escalations.get(req.params.id);
+  if (!request) {
+    res.status(404).json({ error: 'Escalation not found.' });
+    return;
+  }
+
+  if (request.status !== 'pending') {
+    res.status(409).json({
+      error: `Escalation is already ${request.status}.`,
+      escalation: request,
+    });
+    return;
+  }
+
+  const body = req.body as AcceptEscalationRequestBody;
+  const expert = getRequestParticipant(body.expert_id, body.expert_name);
+  if (!expert) {
+    res.status(400).json({
+      error: 'Invalid expert. Send expert_id and expert_name with valid values.',
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const accepted: EscalationRequest = {
+    ...request,
+    status: 'accepted',
+    expert,
+    acceptedAt: now,
+    updatedAt: now,
+  };
+  escalations.set(accepted.id, accepted);
+
+  res.json({
+    escalation: accepted,
+    inviteText: buildExpertInviteText(accepted),
+  });
+});
+
+app.post('/escalations/:id/resolve', (req, res) => {
+  const request = escalations.get(req.params.id);
+  if (!request) {
+    res.status(404).json({ error: 'Escalation not found.' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const resolved: EscalationRequest = {
+    ...request,
+    status: 'resolved',
+    resolvedAt: now,
+    updatedAt: now,
+  };
+  escalations.set(resolved.id, resolved);
+
+  res.json({ escalation: resolved });
 });
 
 app.post('/token', async (req, res): Promise<void> => {
@@ -168,6 +335,29 @@ app.get('/calls/:callType/:callId/transcriptions', async (req, res) => {
       callId,
       transcriptions: extractTranscriptionAssets(response),
       raw: response,
+    });
+  } catch (err) {
+    const { status, message } = normalizeStreamError(err);
+    res.status(status).json({ error: message });
+  }
+});
+
+app.post('/calls/:callType/:callId/end', async (req, res) => {
+  const callType = normalizeCallType(req.params.callType ?? '');
+  const callId = normalizeCallId(req.params.callId ?? '');
+
+  if (!callType || !callId) {
+    res.status(400).json({ error: 'Invalid call type or call ID.' });
+    return;
+  }
+
+  try {
+    const call = getStreamVideoCall(callType, callId);
+    await call.end();
+    res.json({
+      callType,
+      callId,
+      status: 'ended',
     });
   } catch (err) {
     const { status, message } = normalizeStreamError(err);
@@ -294,12 +484,7 @@ async function getReadyTranscript(input: {
   const transcript = await fetchTranscriptFromAsset(asset, input);
 
   if (transcript.items.length === 0) {
-    console.warn(
-      `Transcript asset for ${input.callType}:${input.callId} is available but contains no speech fragments yet.`,
-    );
-    throw new TranscriptPendingError(
-      'Transcript is still processing or no speech has been detected yet.',
-    );
+    return transcript;
   }
 
   return transcript;
@@ -340,6 +525,35 @@ function getExportContentType(format: TranscriptExportFormat): string {
 
 function sanitizeFilenamePart(value: string): string {
   return value.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'call';
+}
+
+function getEscalationStatus(value: unknown): EscalationStatus | null {
+  if (
+    value === 'pending' ||
+    value === 'accepted' ||
+    value === 'resolved' ||
+    value === 'cancelled'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function getRequestParticipant(
+  idValue: unknown,
+  nameValue: unknown,
+): EscalationParticipant | null {
+  if (typeof idValue !== 'string' || typeof nameValue !== 'string') {
+    return null;
+  }
+
+  const id = idValue.trim();
+  const name = nameValue.trim();
+  if (!/^[a-z0-9_-]{3,64}$/i.test(id) || name.length < 2 || name.length > 80) {
+    return null;
+  }
+
+  return { id, name };
 }
 
 function normalizeStreamError(err: unknown): {

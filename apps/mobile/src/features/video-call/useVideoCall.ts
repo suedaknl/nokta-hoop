@@ -18,11 +18,18 @@ import {
   TRANSCRIPT_POLL_INTERVAL_MS,
 } from './constants';
 import { requestStreamToken } from './services/token';
-import type { DemoUser, JoinStatus, LeaveResult, TranscriptFetchStatus } from './types';
+import type {
+  DemoUser,
+  JoinStatus,
+  LeaveOptions,
+  LeaveResult,
+  TranscriptFetchStatus,
+} from './types';
 import {
   isTranscriptNotReadyError,
   requestCallTranscript,
 } from '../../services/transcript';
+import { requestEndCall } from '../../services/calls';
 
 const API_KEY = process.env.EXPO_PUBLIC_STREAM_API_KEY;
 const ENABLE_TRANSCRIPTION =
@@ -59,7 +66,10 @@ export function useVideoCall() {
     try {
       await currentCall?.leave();
     } catch (e) {
-      console.warn('call leave failed:', e);
+      const message = e instanceof Error ? e.message : String(e);
+      if (!message.includes('already been left')) {
+        console.warn('call leave failed:', e);
+      }
     }
     try {
       await currentClient?.disconnectUser(5_000);
@@ -73,7 +83,7 @@ export function useVideoCall() {
     setStatusText(null);
   };
 
-  const join = async () => {
+  const join = async (input: { callId?: string } = {}) => {
     if (joinStatus !== 'idle' || (client && call)) {
       return false;
     }
@@ -107,7 +117,7 @@ export function useVideoCall() {
     }
 
     const user: DemoUser = { id: nextUserId, name: nextUserName };
-    const targetCallId = normalizeCallId(callId) || DEFAULT_CALL_ID;
+    const targetCallId = normalizeCallId(input.callId ?? callId) || DEFAULT_CALL_ID;
     const tokenProvider = async () =>
       withTimeout(
         requestStreamToken(user.id, user.name),
@@ -151,7 +161,7 @@ export function useVideoCall() {
     }
   };
 
-  const leave = async (): Promise<LeaveResult> => {
+  const leave = async (options: LeaveOptions = {}): Promise<LeaveResult> => {
     if (!call || !client) {
       return {
         transcript,
@@ -170,12 +180,19 @@ export function useVideoCall() {
 
     try {
       await stopCallTranscription(targetCall);
+      if (options.endCall !== false) {
+        setStatusText('Ending call for everyone...');
+        await endCallForEveryone(targetCall, targetCallId);
+      }
     } finally {
       await cleanupConnection(targetCall, targetClient);
     }
 
     setStatusText('Waiting for transcript...');
-    const result = await pollTranscript(targetCallId);
+    const result = await pollTranscript(
+      targetCallId,
+      options.transcriptPollAttempts,
+    );
     setStatusText(null);
     return result;
   };
@@ -236,6 +253,30 @@ export function useVideoCall() {
       console.warn('stopTranscription failed:', transcriptionError);
     } finally {
       transcriptionStartedRef.current = false;
+    }
+  };
+
+  const endCallForEveryone = async (
+    targetCall: Call,
+    targetCallId: string,
+  ) => {
+    try {
+      await requestEndCall({
+        callId: targetCallId,
+        callType: CALL_TYPE,
+      });
+      return;
+    } catch (serverError) {
+      console.warn('server end call failed:', serverError);
+    }
+
+    try {
+      await targetCall.endCall();
+    } catch (clientError) {
+      console.warn('client end call failed:', clientError);
+      setError(
+        'Call could not be ended for everyone. You may need to leave from the other device too.',
+      );
     }
   };
 

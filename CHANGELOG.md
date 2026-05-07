@@ -7,6 +7,68 @@ entries below are rebuilt from the current git commit history.
 
 ## [Unreleased]
 
+## [nokta-hoop 0.3.0] - 2026-05-07
+
+### Added
+- Added `packages/hoop-core` as the shared human-loop domain package with
+  mascot chat messages, escalation request models, expert-help detection, and
+  transcript return helpers.
+- Added `MascotDecision` and the `/mascot/decide` endpoint so the Mascot can
+  decide whether to answer directly or escalate to a mentor before creating a
+  support request.
+- Added token-server escalation endpoints for creating, listing, accepting, and
+  resolving mentor support requests.
+- Added mobile Nokta Mascot and Mentor Queue screens so a user can request
+  expert help, mentors can accept pending requests, and accepted requests
+  hand off into the existing Stream Video call flow.
+- Added real Mascot voice interaction on mobile with speech-to-text input and
+  Turkish text-to-speech responses.
+- Added the example-inspired native 3D Nokta Mascot avatar using Three.js,
+  React Three Fiber, and Expo GL.
+- Added optional Groq-powered Mascot answers and mentor/escalation decisions
+  through the token server while keeping deterministic fallback behavior.
+
+### Changed
+- Updated `README.md` to describe the current Mascot, mentor handoff,
+  transcript, and token-server API scope.
+- Changed the mobile app entry point to start from the Mascot conversation and
+  return to the Mascot after expert-call transcript handling.
+- Changed the Mascot screen to a voice-first layout with a full-screen 3D
+  mascot stage, floating microphone controls, and an optional chat overlay.
+- Swapped the 3D mascot shell to simpler standard materials and removed the
+  component-level runtime Three.js namespace import to reduce Expo GL warnings.
+- Changed mentor-call completion to return to the Mascot immediately while
+  locking Mascot input until the background transcript is ready.
+- Adjusted the Mascot screen layout so the 3D avatar stays above the chat
+  overlay instead of being covered by the conversation panel.
+- Nudged the 3D Mascot stage higher while keeping the chat overlay placement
+  unchanged.
+- Changed the Mascot chat overlay to open by default while preserving a larger
+  3D avatar stage.
+- Moved Mascot voice input into the message composer, removed the separate
+  voice-assistant bottom bar, and kept a compact chat composer when minimized.
+- Removed direct room/call entry from the Mascot UI so video calls are only
+  opened through mentor or expert handoff.
+- Changed mentor-call hangup to end the Stream call for every participant and
+  made the other device exit automatically when a call-ended event arrives.
+- Added call-state and ended-at fallbacks plus a custom end button so the call
+  screen can recover even if Stream has already moved the call to `LEFT`.
+- Changed empty Stream transcript assets to finish as completed calls with a
+  no-speech message instead of keeping the Mascot locked in transcript loading.
+- Strengthened Mascot expert routing so deterministic expert-domain signals
+  such as graph algorithms and Hamilton cycles override Groq answers.
+- Changed expert-domain routing to ask for user confirmation before creating a
+  mentor request, while keeping explicit expert requests immediate.
+- Added a Mascot chat reset action that clears the local conversation and
+  pending expert offer when no mentor flow is active.
+- Moved the microphone control to the right side of the send button and
+  replaced the text label with a microphone glyph.
+- Refined the composer microphone glyph to use a clearer classic microphone
+  silhouette.
+- Increased Mascot speech playback speed for a snappier voice response.
+- Removed the deprecated mobile TypeScript `baseUrl` option while keeping the
+  current workspace path mapping intact.
+
 ## [nokta-hoop 0.2.1] - 2026-05-07
 
 ### Changed

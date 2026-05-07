@@ -58,7 +58,7 @@ export function getTranscriptExportUrl(input: {
   return `${getTokenServerUrl()}${path}`;
 }
 
-function getTokenServerUrl(): string {
+export function getTokenServerUrl(): string {
   if (!TOKEN_SERVER_URL) {
     throw new Error('EXPO_PUBLIC_TOKEN_SERVER_URL is not configured');
   }

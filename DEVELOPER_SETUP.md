@@ -44,7 +44,19 @@ Create or open a Stream Video app:
 
 Never commit the Stream API Secret.
 
-## 3. Install Project Dependencies
+## 3. Optional: Get Groq Credentials
+
+Groq is optional. Without it, the Mascot uses the local deterministic decision
+engine. With it, the Mascot can generate real AI answers and decide whether a
+mentor is needed.
+
+1. Go to https://console.groq.com/
+2. Create an API key.
+3. Keep the key only in `services/token-server/.env`.
+
+Never commit the Groq API key.
+
+## 4. Install Project Dependencies
 
 From the repository root:
 
@@ -52,7 +64,7 @@ From the repository root:
 npm install
 ```
 
-## 4. Create Environment Files
+## 5. Create Environment Files
 
 From the repository root:
 
@@ -70,6 +82,8 @@ STREAM_API_KEY=your_stream_api_key
 STREAM_API_SECRET=your_stream_api_secret
 ALLOWED_ORIGINS=*
 STREAM_TRANSCRIPTION_LANGUAGE=tr
+GROQ_API_KEY=optional_groq_api_key_for_ai_mascot
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 Edit `apps/mobile/.env`:
@@ -83,7 +97,7 @@ EXPO_PUBLIC_STREAM_TRANSCRIPTION_LANGUAGE=tr
 
 `EXPO_PUBLIC_TOKEN_SERVER_URL` will be updated after Cloudflare Tunnel starts.
 
-## 5. Start The Token Server
+## 6. Start The Token Server
 
 Terminal 1:
 
@@ -109,7 +123,7 @@ Expected response:
 {"status":"ok","service":"nokta-hoop-token-server"}
 ```
 
-## 6. Expose Token Server With Cloudflare Tunnel
+## 7. Expose Token Server With Cloudflare Tunnel
 
 Terminal 2:
 
@@ -138,7 +152,7 @@ Then update `apps/mobile/.env`:
 EXPO_PUBLIC_TOKEN_SERVER_URL=https://example-random-name.trycloudflare.com
 ```
 
-## 7. Install Or Build The Android Dev Client
+## 8. Install Or Build The Android Dev Client
 
 The app cannot run in Expo Go because it uses native Stream WebRTC modules.
 Each phone needs the Nokta Hoop dev-client APK installed.
@@ -160,7 +174,7 @@ apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 Native dependency changes require a new dev-client APK. JavaScript-only changes
 do not.
 
-## 8. Start Expo Metro
+## 9. Start Expo Metro
 
 Terminal 3:
 
@@ -183,7 +197,7 @@ Quick firewall rule for Metro:
 New-NetFirewallRule -DisplayName "Nokta Hoop Metro 8081" -Direction Inbound -LocalPort 8081 -Protocol TCP -Action Allow -Profile Private
 ```
 
-## 9. Run The App
+## 10. Run The App
 
 1. Open the dev-client app on the phone.
 2. Open the Metro project from the QR/link.
@@ -194,7 +208,7 @@ New-NetFirewallRule -DisplayName "Nokta Hoop Metro 8081" -Direction Inbound -Loc
 7. Wait for the transcript screen.
 8. Press refresh if Stream transcription is still processing.
 
-## 10. Useful Commands
+## 11. Useful Commands
 
 Run token server:
 
@@ -227,7 +241,7 @@ npm run typecheck
 npm run test
 ```
 
-## 11. Common Problems
+## 12. Common Problems
 
 ### Token request timed out
 

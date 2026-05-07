@@ -1,23 +1,35 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
-  HangUpCallButton,
   ReactionsButton,
   ToggleAudioPublishingButton,
   ToggleCameraFaceButton,
   ToggleVideoPublishingButton,
-  type CallControlProps,
 } from '@stream-io/video-react-native-sdk';
+
+type VideoCallControlsProps = {
+  onHangupCallHandler: () => Promise<void> | void;
+};
 
 export function VideoCallControls({
   onHangupCallHandler,
-}: CallControlProps) {
+}: VideoCallControlsProps) {
   return (
     <View style={styles.container}>
       <ToggleVideoPublishingButton />
       <ToggleAudioPublishingButton />
       <ToggleCameraFaceButton />
       <ReactionsButton />
-      <HangUpCallButton onHangupCallHandler={onHangupCallHandler} />
+      <Pressable
+        accessibilityLabel="Görüşmeyi bitir"
+        accessibilityRole="button"
+        onPress={() => void onHangupCallHandler()}
+        style={({ pressed }) => [
+          styles.endButton,
+          pressed ? styles.endButtonPressed : null,
+        ]}
+      >
+        <Text style={styles.endButtonText}>Bitir</Text>
+      </Pressable>
     </View>
   );
 }
@@ -38,5 +50,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     paddingHorizontal: 10,
     paddingVertical: 12,
+  },
+  endButton: {
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    borderRadius: 999,
+    height: 42,
+    justifyContent: 'center',
+    minWidth: 58,
+    paddingHorizontal: 12,
+  },
+  endButtonPressed: {
+    opacity: 0.8,
+  },
+  endButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

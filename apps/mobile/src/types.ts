@@ -1,1 +1,5 @@
-export type AppScreen = 'home' | 'join' | 'call' | 'transcript';
+export type AppScreen =
+  | 'mascot'
+  | 'mentorQueue'
+  | 'call'
+  | 'transcript';

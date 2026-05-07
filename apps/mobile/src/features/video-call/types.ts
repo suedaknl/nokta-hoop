@@ -19,3 +19,8 @@ export type LeaveResult = {
   status: TranscriptFetchStatus;
   message: string | null;
 };
+
+export type LeaveOptions = {
+  endCall?: boolean;
+  transcriptPollAttempts?: number;
+};

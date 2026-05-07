@@ -41,9 +41,12 @@ export function TranscriptScreen({
   onBack,
 }: TranscriptScreenProps) {
   const isWaiting = status === 'processing' || refreshing;
+  const hasTranscriptLines = Boolean(transcript && transcript.items.length > 0);
   const title =
     status === 'ready' && transcript
-      ? `${transcript.items.length} transcript lines`
+      ? hasTranscriptLines
+        ? `${transcript.items.length} transcript lines`
+        : 'Konuşma bulunamadı'
       : isWaiting
         ? 'Transcript loading'
       : 'Transcript';
@@ -123,15 +126,26 @@ export function TranscriptScreen({
               </View>
             </View>
 
-            {transcript.items.map((item) => (
-              <View key={item.id} style={styles.line}>
-                <View style={styles.lineMeta}>
-                  <Text style={styles.time}>{formatOffset(item.startedAtMs)}</Text>
-                  <Text style={styles.speaker}>{item.speakerLabel}</Text>
+            {hasTranscriptLines ? (
+              transcript.items.map((item) => (
+                <View key={item.id} style={styles.line}>
+                  <View style={styles.lineMeta}>
+                    <Text style={styles.time}>{formatOffset(item.startedAtMs)}</Text>
+                    <Text style={styles.speaker}>{item.speakerLabel}</Text>
+                  </View>
+                  <Text style={styles.text}>{item.text}</Text>
                 </View>
-                <Text style={styles.text}>{item.text}</Text>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Konuşma algılanmadı</Text>
+                <Text style={styles.emptyMessage}>
+                  Stream transcript dosyasını döndürdü, ancak görüşmede
+                  yazıya çevrilecek konuşma satırı bulunamadı. Görüşme
+                  tamamlandı kabul edilir.
+                </Text>
               </View>
-            ))}
+            )}
           </>
         ) : (
           <View style={styles.emptyState}>
