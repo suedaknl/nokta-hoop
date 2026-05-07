@@ -12,6 +12,10 @@ build/
 coverage/
 .expo/
 .expo-shared/
+__pycache__/
+*.pyc
+services/tts-server/cache/
+services/tts-server/.venv/
 
 # Environment and secrets
 .env

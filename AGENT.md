@@ -23,7 +23,9 @@ Her degisiklik net kapsamli, bagimsiz ve test edilebilir olmalidir.
     katmanidir.
   - `hoop-wiki` uzman yaniti/transkript ozetini markdown wiki'ye ingest,
     reconcile ve query katmanidir.
-  - `token-server` Stream token issuing servisidir.
+  - `token-server` Stream token, Mascot decision, escalation ve transcript
+    API servisidir.
+  - `tts-server` Mascot TTS icin lokal Chatterbox servisidir.
   - `hoop-proxy` MCP/SSE proxy servisidir.
   - `apps/mobile` Expo React Native kullanici uygulamasidir.
 - `hoop-call` icine HITL policy, Slack/WhatsApp/Email adapter logic veya wiki
@@ -34,8 +36,8 @@ Her degisiklik net kapsamli, bagimsiz ve test edilebilir olmalidir.
   mantigi koyma.
 - Context Doctor kodlari kopyalanacaksa yalnizca gerekli video-call pattern'leri
   tasinmali; Tavus/avatar/AI/intake/medical logic alinmamalidir.
-- Bu fazda istenen kapsam AI degildir: iki kisilik/cok kisilik video gorusme,
-  gorusme bitince okunabilir transkript ve gerekirse export.
+- Mevcut calisan uygulama Mascot sohbeti, opsiyonel Groq karari, mentor
+  escalation, Stream Video handoff, transcript ve export akisidir.
 - Gercek kullanici verisi, secret, API key, Stream secret veya PII commit etme.
 
 ## Versiyonlama ve Etiketleme
@@ -80,7 +82,7 @@ Her tamamlanan iterasyon sonunda su adimlari uygula:
 | SSE | Escalation ve transcript state event delivery |
 | node:test | Backend servis testleri |
 
-Aktif yapi:
+Repo yapi ilkesi:
 
 ```text
 README.md
@@ -89,21 +91,20 @@ IDEA.md
 AGENT.md
 DESIGN.md
 CHANGELOG.md
-```
-
-Planlanan yapi:
-
-```text
-docs/
 packages/hoop-core
 packages/hoop-call
 packages/hoop-wiki
 services/token-server
+services/tts-server
 services/hoop-proxy
 apps/mobile
 fixtures/
 .github/workflows/
 ```
+
+Bu liste durum raporu degil, ajanlar icin sahiplik ve yerlestirme rehberidir.
+Bir klasor bos veya henuz uygulanmamis olabilir; yeni kod eklerken bu sinirlara
+uy, ancak yalnizca durum guncellemek icin AGENT.md degistirme.
 
 ### 2. Service Naming Convention
 
@@ -114,9 +115,10 @@ Servis veya paket adi klasor adi ile ayni kalmalidir.
 | `packages/hoop-core` | Policy, MCP runtime, adapters, writeback coordination |
 | `packages/hoop-call` | Stream Video integration, call sessions, transcript lifecycle |
 | `packages/hoop-wiki` | Markdown wiki ingest, reconcile, query |
-| `services/token-server` | Stream token issuing |
+| `services/token-server` | Stream token, Mascot decision, escalation, transcript API |
+| `services/tts-server` | Local Chatterbox Mascot TTS service |
 | `services/hoop-proxy` | MCP proxy and SSE endpoint |
-| `apps/mobile` | Expo React Native video-call app |
+| `apps/mobile` | Expo React Native Mascot and mentor handoff app |
 
 Context Doctor root yapisini veya eski `services/avatar-*` yapisini bu repoya
 aynen tasima.
@@ -138,6 +140,8 @@ Root script isimleri app, servis veya paket prefix'i ile baslamalidir:
 | `wiki:test` | `packages/hoop-wiki` tests |
 | `server:dev` | Stream token server |
 | `server:typecheck` | Token server typecheck |
+| `tts:dev` | Local Chatterbox TTS service |
+| `tts:install` | Chatterbox Python dependencies |
 | `proxy:dev` | Hoop proxy service |
 | `proxy:typecheck` | Hoop proxy typecheck |
 | `typecheck` | All active typechecks |
@@ -148,6 +152,7 @@ Root script isimleri app, servis veya paket prefix'i ile baslamalidir:
 - Mobile app only uses `EXPO_PUBLIC_*` values.
 - Stream API secret stays in `services/token-server`.
 - Stream transcription configuration must not expose secrets to mobile.
+- Chatterbox voice prompt files stay local and are referenced by path only.
 - `services/hoop-proxy` owns MCP/SSE endpoint secrets when introduced.
 - Adapter secrets for Slack, WhatsApp, or Email stay outside mobile code.
 - `.env` files with real values must not be committed.

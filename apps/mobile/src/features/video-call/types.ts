@@ -24,3 +24,5 @@ export type LeaveOptions = {
   endCall?: boolean;
   transcriptPollAttempts?: number;
 };
+
+export type JoinMediaMode = 'requester' | 'mentor' | 'default';

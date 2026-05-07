@@ -41,7 +41,10 @@
         {
           "android": {
             "minSdkVersion": 24,
-            "buildArchs": ["arm64-v8a", "x86_64"]
+            "buildArchs": [
+              "arm64-v8a",
+              "x86_64"
+            ]
           }
         }
       ],
@@ -50,9 +53,12 @@
         {
           "microphonePermission": "Allow Nokta Hoop to use the microphone for Mascot voice conversations.",
           "speechRecognitionPermission": "Allow Nokta Hoop to convert your speech into text for Mascot conversations.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
-      ]
+      ],
+      "expo-audio"
     ]
   }
 }

@@ -9,6 +9,8 @@ import {
   type EscalationRequest,
   type EscalationStatus,
   type MascotChatMessage,
+  type MentorSessionMessage,
+  type MentorSessionMessageRole,
 } from '@nokta-hoop/hoop-core';
 import { StreamClient } from '@stream-io/node-sdk';
 import {
@@ -68,9 +70,28 @@ type AcceptEscalationRequestBody = {
   expert_name?: string;
 };
 
+type CreateMentorSessionMessageBody = {
+  author_id?: string;
+  author_name?: string;
+  role?: MentorSessionMessageRole;
+  text?: string;
+};
+
 type MascotDecisionRequestBody = {
   message?: string;
   history?: MascotChatMessage[];
+};
+
+type MascotTtsRequestBody = {
+  text?: string;
+  language_id?: string;
+};
+
+type TtsServerResponse = {
+  audioPath?: string;
+  filename?: string;
+  languageId?: string;
+  provider?: string;
 };
 
 class TranscriptPendingError extends Error {
@@ -87,10 +108,13 @@ const apiKey = process.env.STREAM_API_KEY;
 const apiSecret = process.env.STREAM_API_SECRET;
 const allowedOrigins = process.env.ALLOWED_ORIGINS ?? '*';
 const transcriptionLanguage = process.env.STREAM_TRANSCRIPTION_LANGUAGE ?? 'tr';
+const ttsServerUrl = normalizeOptionalUrl(process.env.TTS_SERVER_URL);
+const mascotTtsLanguage = process.env.MASCOT_TTS_LANGUAGE_ID ?? 'tr';
 
 const streamClient =
   apiKey && apiSecret ? new StreamClient(apiKey, apiSecret) : null;
 const escalations = new Map<string, EscalationRequest>();
+const mentorSessionMessages = new Map<string, MentorSessionMessage[]>();
 
 const corsOrigins =
   allowedOrigins === '*' || allowedOrigins.trim() === ''
@@ -111,6 +135,8 @@ app.get('/', (_req, res) => {
     users: '/users',
     mascotDecision: '/mascot/decide',
     escalations: '/escalations',
+    mascotTts: '/tts/mascot',
+    mentorMessages: '/escalations/{id}/messages',
     transcript: '/calls/default/{callId}/transcript',
     export: '/calls/default/{callId}/export?format=md',
   });
@@ -150,6 +176,96 @@ app.post('/mascot/decide', async (req, res) => {
   });
 
   res.json({ decision });
+});
+
+app.post('/tts/mascot', async (req, res): Promise<void> => {
+  const body = req.body as MascotTtsRequestBody;
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+
+  if (text.length < 1) {
+    res.status(400).json({ error: 'Invalid text.' });
+    return;
+  }
+
+  if (!ttsServerUrl) {
+    res.status(503).json({
+      error: 'TTS_SERVER_URL is not configured.',
+      provider: 'device',
+    });
+    return;
+  }
+
+  try {
+    const response = await fetch(`${ttsServerUrl}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        language_id:
+          typeof body.language_id === 'string' && body.language_id.trim()
+            ? body.language_id.trim()
+            : mascotTtsLanguage,
+      }),
+    });
+
+    if (!response.ok) {
+      res.status(response.status).json({
+        error: await readTtsError(response),
+        provider: 'chatterbox-multilingual',
+      });
+      return;
+    }
+
+    const ttsBody = (await response.json()) as TtsServerResponse;
+    const filename = getAudioFilename(ttsBody);
+    if (!filename) {
+      res.status(502).json({ error: 'TTS server response is invalid.' });
+      return;
+    }
+
+    res.json({
+      audioPath: `/tts/audio/${filename}`,
+      filename,
+      languageId: ttsBody.languageId ?? mascotTtsLanguage,
+      provider: ttsBody.provider ?? 'chatterbox-multilingual',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'TTS request failed.';
+    res.status(502).json({ error: message, provider: 'chatterbox-multilingual' });
+  }
+});
+
+app.get('/tts/audio/:filename', async (req, res): Promise<void> => {
+  const filename = req.params.filename;
+
+  if (!isSafeAudioFilename(filename)) {
+    res.status(400).json({ error: 'Invalid audio filename.' });
+    return;
+  }
+
+  if (!ttsServerUrl) {
+    res.status(503).json({ error: 'TTS_SERVER_URL is not configured.' });
+    return;
+  }
+
+  try {
+    const response = await fetch(`${ttsServerUrl}/audio/${filename}`);
+    if (!response.ok) {
+      res.status(response.status).json({ error: await readTtsError(response) });
+      return;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader(
+      'Cache-Control',
+      response.headers.get('cache-control') ?? 'public, max-age=86400',
+    );
+    res.send(buffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'TTS audio proxy failed.';
+    res.status(502).json({ error: message });
+  }
 });
 
 app.get('/escalations', (req, res) => {
@@ -270,6 +386,60 @@ app.post('/escalations/:id/resolve', (req, res) => {
   escalations.set(resolved.id, resolved);
 
   res.json({ escalation: resolved });
+});
+
+app.get('/escalations/:id/messages', (req, res) => {
+  const request = escalations.get(req.params.id);
+  if (!request) {
+    res.status(404).json({ error: 'Escalation not found.' });
+    return;
+  }
+
+  res.json({
+    messages: mentorSessionMessages.get(request.id) ?? [],
+  });
+});
+
+app.post('/escalations/:id/messages', (req, res) => {
+  const request = escalations.get(req.params.id);
+  if (!request) {
+    res.status(404).json({ error: 'Escalation not found.' });
+    return;
+  }
+
+  if (request.status !== 'accepted') {
+    res.status(409).json({
+      error: 'Mentor session messages can only be added after acceptance.',
+      escalation: request,
+    });
+    return;
+  }
+
+  const body = req.body as CreateMentorSessionMessageBody;
+  const author = getRequestParticipant(body.author_id, body.author_name);
+  const role = getMentorSessionMessageRole(body.role);
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+
+  if (!author || !role || text.length < 1) {
+    res.status(400).json({
+      error: 'Invalid message. Send author_id, author_name, role, and text.',
+    });
+    return;
+  }
+
+  const message: MentorSessionMessage = {
+    id: createMentorSessionMessageId(),
+    escalationId: request.id,
+    role,
+    author,
+    text,
+    createdAt: new Date().toISOString(),
+  };
+  const messages = mentorSessionMessages.get(request.id) ?? [];
+  messages.push(message);
+  mentorSessionMessages.set(request.id, messages);
+
+  res.status(201).json({ message });
 });
 
 app.post('/token', async (req, res): Promise<void> => {
@@ -527,6 +697,35 @@ function sanitizeFilenamePart(value: string): string {
   return value.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'call';
 }
 
+function normalizeOptionalUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.replace(/\/+$/, '');
+}
+
+function getAudioFilename(body: TtsServerResponse): string | null {
+  const filename = body.filename ?? body.audioPath?.split('/').pop();
+  if (!filename || !isSafeAudioFilename(filename)) {
+    return null;
+  }
+  return filename;
+}
+
+function isSafeAudioFilename(filename: string): boolean {
+  return /^[a-f0-9]{32}\.wav$/.test(filename);
+}
+
+async function readTtsError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string; error?: string };
+    return body.error ?? body.detail ?? `TTS request failed: ${response.status}`;
+  } catch {
+    return `TTS request failed: ${response.status}`;
+  }
+}
+
 function getEscalationStatus(value: unknown): EscalationStatus | null {
   if (
     value === 'pending' ||
@@ -534,6 +733,15 @@ function getEscalationStatus(value: unknown): EscalationStatus | null {
     value === 'resolved' ||
     value === 'cancelled'
   ) {
+    return value;
+  }
+  return null;
+}
+
+function getMentorSessionMessageRole(
+  value: unknown,
+): MentorSessionMessageRole | null {
+  if (value === 'requester' || value === 'expert') {
     return value;
   }
   return null;
@@ -554,6 +762,11 @@ function getRequestParticipant(
   }
 
   return { id, name };
+}
+
+function createMentorSessionMessageId(): string {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `mentor-msg-${Date.now()}-${random}`;
 }
 
 function normalizeStreamError(err: unknown): {

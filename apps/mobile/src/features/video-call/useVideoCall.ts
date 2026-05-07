@@ -20,6 +20,7 @@ import {
 import { requestStreamToken } from './services/token';
 import type {
   DemoUser,
+  JoinMediaMode,
   JoinStatus,
   LeaveOptions,
   LeaveResult,
@@ -83,7 +84,9 @@ export function useVideoCall() {
     setStatusText(null);
   };
 
-  const join = async (input: { callId?: string } = {}) => {
+  const join = async (
+    input: { callId?: string; mediaMode?: JoinMediaMode } = {},
+  ) => {
     if (joinStatus !== 'idle' || (client && call)) {
       return false;
     }
@@ -137,11 +140,15 @@ export function useVideoCall() {
       setStatusText('Joining call...');
       nextCall = nextClient.call(CALL_TYPE, targetCallId);
       await withTimeout(
-        nextCall.join({ create: true }),
+        nextCall.join({
+          create: true,
+          video: input.mediaMode === 'mentor',
+        }),
         CALL_JOIN_TIMEOUT_MS,
         'Stream call join timed out. Check internet access, Stream app settings, and Metro logs.',
       );
 
+      await configureCallMedia(nextCall, input.mediaMode ?? 'default');
       await startCallTranscription(nextCall);
 
       setClient(nextClient);
@@ -239,6 +246,26 @@ export function useVideoCall() {
       setTranscriptMessage(
         'Transcription could not be started. Check Stream transcription settings.',
       );
+    }
+  };
+
+  const configureCallMedia = async (
+    targetCall: Call,
+    mediaMode: JoinMediaMode,
+  ) => {
+    try {
+      if (mediaMode === 'requester') {
+        await targetCall.camera.disable(true);
+        await targetCall.microphone.disable(true);
+        return;
+      }
+
+      if (mediaMode === 'mentor') {
+        await targetCall.microphone.enable();
+        await targetCall.camera.enable();
+      }
+    } catch (mediaError) {
+      console.warn('configure call media failed:', mediaError);
     }
   };
 

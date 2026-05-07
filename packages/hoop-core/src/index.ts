@@ -1,5 +1,6 @@
 export {
   buildExpertInviteText,
+  buildMentorSessionReturnMessage,
   buildMascotReply,
   buildTranscriptReturnMessage,
   createEscalationRequest,
@@ -17,4 +18,6 @@ export {
   type MascotDecisionInput,
   type MascotDecisionSource,
   type MascotChatRole,
+  type MentorSessionMessage,
+  type MentorSessionMessageRole,
 } from './mascotEscalation.ts';

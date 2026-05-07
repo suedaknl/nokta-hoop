@@ -1,0 +1,4 @@
+chatterbox-tts
+fastapi
+soundfile
+uvicorn[standard]

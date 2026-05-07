@@ -7,6 +7,32 @@ entries below are rebuilt from the current git commit history.
 
 ## [Unreleased]
 
+## [nokta-hoop 0.4.0] - 2026-05-07
+
+### Added
+- Added an optional local Chatterbox Multilingual TTS service under
+  `services/tts-server` for generating Turkish Mascot speech audio.
+- Added token-server TTS proxy endpoints so mobile clients can request Mascot
+  speech through the existing public token-server URL.
+- Added mobile Chatterbox speech playback with `expo-audio` and automatic
+  fallback to device speech when the TTS service is unavailable.
+- Added mentor-session chat message endpoints so user messages can be shown to
+  the mentor during an accepted live support session.
+- Added an embedded live mentor camera surface that replaces the Mascot avatar
+  without moving the user to a separate video-call screen.
+
+### Changed
+- Updated `AGENT.md` repo structure guidance so agents treat the listed folders
+  as ownership boundaries instead of stale active/planned status.
+- Updated environment examples and developer docs with Chatterbox TTS setup,
+  proxy configuration, and dev-client rebuild guidance.
+- Changed accepted mentor handoff so the user stays in the same Mascot chat,
+  writes to the mentor from that chat, and pauses Mascot/Groq responses until
+  the mentor session ends.
+- Changed mentor-session transcript return to summarize the user's written
+  questions with the mentor's spoken transcript instead of treating it as a
+  normal two-way video call transcript.
+
 ## [nokta-hoop 0.3.0] - 2026-05-07
 
 ### Added

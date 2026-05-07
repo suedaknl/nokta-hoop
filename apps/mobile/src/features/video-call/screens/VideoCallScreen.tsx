@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,10 +7,11 @@ import {
   StreamVideo,
   type StreamVideoClient,
 } from '@stream-io/video-react-native-sdk';
-import { CallingState, type Call } from '@stream-io/video-client';
+import { type Call } from '@stream-io/video-client';
 
 import { EqualParticipantsGrid } from '../components/EqualParticipantsGrid';
 import { VideoCallControls } from '../components/VideoCallControls';
+import { useCallEndedEffect } from '../useCallEndedEffect';
 
 type VideoCallScreenProps = {
   call: Call;
@@ -30,11 +31,11 @@ export function VideoCallScreen({
   onLeave,
 }: VideoCallScreenProps) {
   const [controlsVisible, setControlsVisible] = useState(true);
-  const callEndedHandledRef = useRef(false);
-
-  useEffect(() => {
-    callEndedHandledRef.current = false;
-  }, [call]);
+  const callEnded = useCallEndedEffect({
+    call,
+    disabled: leaving,
+    onCallEnded,
+  });
 
   useEffect(() => {
     if (!controlsVisible || leaving) {
@@ -48,50 +49,8 @@ export function VideoCallScreen({
     return () => clearTimeout(timeout);
   }, [controlsVisible, leaving]);
 
-  useEffect(() => {
-    const handleCallEnded = () => {
-      if (leaving || callEndedHandledRef.current) {
-        return;
-      }
-
-      callEndedHandledRef.current = true;
-      void onCallEnded();
-    };
-
-    const offCallEnded = call.on('call.ended', handleCallEnded);
-    const offSfuCallEnded = call.on('callEnded', handleCallEnded);
-    const callingStateSubscription = call.state.callingState$.subscribe(
-      (callingState) => {
-        if (callingState === CallingState.LEFT) {
-          handleCallEnded();
-        }
-      },
-    );
-    const endedAtSubscription = call.state.endedAt$.subscribe((endedAt) => {
-      if (endedAt) {
-        handleCallEnded();
-      }
-    });
-    const fallbackTimer = setInterval(() => {
-      if (
-        call.state.callingState === CallingState.LEFT ||
-        call.state.endedAt
-      ) {
-        handleCallEnded();
-      }
-    }, 1000);
-
-    return () => {
-      offCallEnded();
-      offSfuCallEnded();
-      callingStateSubscription.unsubscribe();
-      endedAtSubscription.unsubscribe();
-      clearInterval(fallbackTimer);
-    };
-  }, [call, leaving, onCallEnded]);
-
   const handleLeavePress = async () => {
-    callEndedHandledRef.current = true;
+    callEnded.markHandled();
     await onLeave();
   };
 

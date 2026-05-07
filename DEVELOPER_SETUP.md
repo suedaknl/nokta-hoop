@@ -56,7 +56,28 @@ mentor is needed.
 
 Never commit the Groq API key.
 
-## 4. Install Project Dependencies
+## 4. Optional: Prepare Chatterbox TTS
+
+Chatterbox Multilingual is optional. If it is running, the Mascot uses generated
+Turkish speech. If it is not running, the app falls back to the phone's own TTS
+engine.
+
+Install Python 3.10 or 3.11. GPU is recommended; CPU may be slow.
+
+From the repository root:
+
+```powershell
+npm run tts:install
+copy services\tts-server\.env.example services\tts-server\.env
+```
+
+Optional voice cloning uses a short clean `.wav` sample:
+
+```env
+CHATTERBOX_AUDIO_PROMPT_PATH=D:\path\to\voice.wav
+```
+
+## 5. Install Project Dependencies
 
 From the repository root:
 
@@ -64,7 +85,7 @@ From the repository root:
 npm install
 ```
 
-## 5. Create Environment Files
+## 6. Create Environment Files
 
 From the repository root:
 
@@ -84,6 +105,8 @@ ALLOWED_ORIGINS=*
 STREAM_TRANSCRIPTION_LANGUAGE=tr
 GROQ_API_KEY=optional_groq_api_key_for_ai_mascot
 GROQ_MODEL=llama-3.3-70b-versatile
+TTS_SERVER_URL=http://127.0.0.1:8790
+MASCOT_TTS_LANGUAGE_ID=tr
 ```
 
 Edit `apps/mobile/.env`:
@@ -93,13 +116,29 @@ EXPO_PUBLIC_STREAM_API_KEY=your_stream_api_key
 EXPO_PUBLIC_TOKEN_SERVER_URL=https://replace-after-cloudflare-starts.trycloudflare.com
 EXPO_PUBLIC_STREAM_ENABLE_TRANSCRIPTION=true
 EXPO_PUBLIC_STREAM_TRANSCRIPTION_LANGUAGE=tr
+EXPO_PUBLIC_MASCOT_TTS_PROVIDER=chatterbox
+EXPO_PUBLIC_MASCOT_TTS_LANGUAGE=tr
+EXPO_PUBLIC_MASCOT_TTS_TIMEOUT_MS=20000
 ```
 
 `EXPO_PUBLIC_TOKEN_SERVER_URL` will be updated after Cloudflare Tunnel starts.
 
-## 6. Start The Token Server
+## 7. Start The Optional TTS Server
+
+Skip this step if you want to use the phone's own TTS engine.
 
 Terminal 1:
+
+```powershell
+npm run tts:dev
+```
+
+The first request can be slow because Chatterbox downloads and loads model
+weights.
+
+## 8. Start The Token Server
+
+Terminal 2:
 
 ```powershell
 npm run server:dev
@@ -123,9 +162,9 @@ Expected response:
 {"status":"ok","service":"nokta-hoop-token-server"}
 ```
 
-## 7. Expose Token Server With Cloudflare Tunnel
+## 9. Expose Token Server With Cloudflare Tunnel
 
-Terminal 2:
+Terminal 3:
 
 ```powershell
 cloudflared tunnel --url http://127.0.0.1:8787
@@ -152,7 +191,7 @@ Then update `apps/mobile/.env`:
 EXPO_PUBLIC_TOKEN_SERVER_URL=https://example-random-name.trycloudflare.com
 ```
 
-## 8. Install Or Build The Android Dev Client
+## 10. Install Or Build The Android Dev Client
 
 The app cannot run in Expo Go because it uses native Stream WebRTC modules.
 Each phone needs the Nokta Hoop dev-client APK installed.
@@ -171,12 +210,13 @@ The generated debug APK is usually located at:
 apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Native dependency changes require a new dev-client APK. JavaScript-only changes
-do not.
+Native dependency changes require a new dev-client APK. Adding Chatterbox
+playback added `expo-audio`, so a dev-client built before this change must be
+rebuilt.
 
-## 9. Start Expo Metro
+## 11. Start Expo Metro
 
-Terminal 3:
+Terminal 4:
 
 ```powershell
 npm run mobile:start -- --clear
@@ -197,23 +237,35 @@ Quick firewall rule for Metro:
 New-NetFirewallRule -DisplayName "Nokta Hoop Metro 8081" -Direction Inbound -LocalPort 8081 -Protocol TCP -Action Allow -Profile Private
 ```
 
-## 10. Run The App
+## 12. Run The App
 
 1. Open the dev-client app on the phone.
 2. Open the Metro project from the QR/link.
-3. Enter a display name and user ID.
-4. Share the same room ID with another tester.
-5. Join the call.
-6. End the call.
-7. Wait for the transcript screen.
-8. Press refresh if Stream transcription is still processing.
+3. Talk to the Mascot by text or microphone.
+4. Ask for a mentor or use a topic that needs expert support.
+5. On the mentor phone, open the Mentor screen and accept the request.
+6. The user stays in the same chat screen; the Mascot area is replaced by the
+   mentor camera.
+7. The user writes to the mentor in the same chat. Mascot/Groq does not answer
+   during the live mentor session.
+8. The user camera and microphone stay off; the mentor answers with camera and
+   microphone.
+9. End the mentor session from either phone.
+10. Wait while the mentor speech transcript is prepared and returned to the
+    Mascot context with the user's written questions.
 
-## 11. Useful Commands
+## 13. Useful Commands
 
 Run token server:
 
 ```powershell
 npm run server:dev
+```
+
+Run Chatterbox TTS server:
+
+```powershell
+npm run tts:dev
 ```
 
 Run Cloudflare Tunnel:
@@ -241,7 +293,7 @@ npm run typecheck
 npm run test
 ```
 
-## 12. Common Problems
+## 14. Common Problems
 
 ### Token request timed out
 
@@ -274,6 +326,15 @@ cloudflared tunnel --url http://localhost:8787
 
 This is expected. The app needs a custom dev-client APK because Stream Video
 uses native WebRTC modules.
+
+### Mascot still uses phone TTS
+
+Check:
+
+- `npm run tts:dev` is running.
+- `services/token-server/.env` has `TTS_SERVER_URL=http://127.0.0.1:8790`.
+- `apps/mobile/.env` has `EXPO_PUBLIC_MASCOT_TTS_PROVIDER=chatterbox`.
+- token server and Metro were restarted after editing `.env`.
 
 ### Phone cannot connect to development server
 

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildExpertInviteText,
+  buildMentorSessionReturnMessage,
   buildTranscriptReturnMessage,
   createEscalationRequest,
   decideMascotAction,
@@ -56,6 +57,18 @@ test('builds expert invite and mascot return message', () => {
     transcriptLines: [],
   });
   assert.match(emptyMessage, /konuşma algılanmadı/);
+});
+
+test('builds embedded mentor session return message', () => {
+  const message = buildMentorSessionReturnMessage({
+    expertName: 'Mentor',
+    requesterMessages: ['Hamilton döngüsü nedir?'],
+    transcriptLines: ['Hamilton döngüsü çizgedeki her düğümü bir kez gezer.'],
+  });
+
+  assert.match(message, /Mentor/);
+  assert.match(message, /Hamilton/);
+  assert.match(message, /Mentorun/);
 });
 
 test('decides when mascot can answer or should escalate', () => {

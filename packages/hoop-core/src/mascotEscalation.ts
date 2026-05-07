@@ -30,6 +30,17 @@ export type EscalationRequest = {
   resolvedAt?: string;
 };
 
+export type MentorSessionMessageRole = 'requester' | 'expert';
+
+export type MentorSessionMessage = {
+  id: string;
+  escalationId: string;
+  role: MentorSessionMessageRole;
+  author: EscalationParticipant;
+  text: string;
+  createdAt: string;
+};
+
 export type EscalationSignal = {
   topic: string;
   question: string;
@@ -244,6 +255,32 @@ export function buildTranscriptReturnMessage(input: {
   return `${expertName} ile görüşme tamamlandı. Uzman görüşmesinden notlar: ${lines.join(' ')}`;
 }
 
+export function buildMentorSessionReturnMessage(input: {
+  expertName?: string;
+  requesterMessages: string[];
+  transcriptLines: string[];
+}): string {
+  const expertName = input.expertName?.trim() || 'uzman';
+  const requesterMessages = input.requesterMessages
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-3);
+  const transcriptLines = input.transcriptLines
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+
+  if (transcriptLines.length === 0) {
+    return `${expertName} ile mentor oturumu tamamlandi. Kullanici chatten ${formatCompactList(
+      requesterMessages,
+    )} yazdi; transkriptte mentor konusmasi algilanmadi.`;
+  }
+
+  return `${expertName} ile mentor oturumu tamamlandi. Kullanici chatten ${formatCompactList(
+    requesterMessages,
+  )} yazdi. Mentorun konusmasindan notlar: ${transcriptLines.join(' ')}`;
+}
+
 export function normalizeEscalationTopic(value: string): string {
   const cleaned = value
     .replace(/\s+/g, ' ')
@@ -268,6 +305,14 @@ function createEscalationId(now: Date): string {
     .slice(0, 14);
   const random = Math.random().toString(36).slice(2, 8);
   return `esc-${stamp}-${random}`;
+}
+
+function formatCompactList(lines: string[]): string {
+  if (lines.length === 0) {
+    return 'ek bir soru olmadan';
+  }
+
+  return lines.map((line) => `"${line}"`).join(', ');
 }
 
 function createEscalationCallId(escalationId: string): string {
