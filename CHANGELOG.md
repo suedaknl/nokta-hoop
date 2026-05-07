@@ -7,6 +7,13 @@ entries below are rebuilt from the current git commit history.
 
 ## [Unreleased]
 
+## [nokta-hoop 0.2.1] - 2026-05-07
+
+### Changed
+- Expanded and localized `README.md` in Turkish, covering the broader Nokta
+  Hoop governance/writeback goal, the current video call/transcript MVP,
+  repository layout, setup flow, commands, API endpoints, and scope boundaries.
+
 ## [nokta-hoop 0.2.0] - 2026-05-06
 
 ### Added
