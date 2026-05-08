@@ -7,6 +7,53 @@ entries below are rebuilt from the current git commit history.
 
 ## [Unreleased]
 
+## [nokta-hoop 0.5.0] - 2026-05-08
+
+### Added
+- Added a `/tts/warmup` token-server endpoint and mobile startup warmup request
+  so demo Mascot phrases can be pre-generated into the Chatterbox cache.
+- Added a selectable Piper TTS provider for the local TTS server so the Mascot
+  can use a lighter Turkish voice model without removing Chatterbox.
+- Added cancellation for pending mentor requests from the waiting status card.
+
+### Changed
+- Changed Mascot Chatterbox playback to split responses into sentence-sized
+  chunks, start playback after the first chunk is ready, and prefetch the next
+  chunk while the current one is playing.
+- Changed the Mascot welcome message to be spoken on app startup instead of
+  only being inserted into the chat history.
+- Changed mentor mode so the chat panel is shorter over the live mentor camera
+  and the composer microphone remains available for speech-to-text messages.
+- Changed Mascot status cards to appear above the title, auto-hide accepted
+  mentor notices, and give the mentor live screen a taller self-video area.
+- Changed requester-side mentor sessions to use Stream's listener audio role so
+  the mentor handoff behaves more like a live broadcast with chat input.
+- Changed mentor escalations to create Stream `livestream` calls, start the
+  live state through the token server, and carry the escalation call type
+  through join, end, and transcript requests.
+- Changed livestream requester join to retry while the call is briefly
+  backstage, and moved livestream transcription start/stop to token-server
+  endpoints so mobile user roles do not need elevated Stream permissions.
+- Changed mentor speech-to-text so the viewer audio manager is suspended while
+  recording and restored as a listener afterward.
+- Changed local TTS cache/model paths to resolve relative to
+  `services/tts-server` when relative paths are configured.
+- Changed the local TTS server to load `services/tts-server/.env`
+  automatically before selecting Chatterbox or Piper.
+- Changed the TTS example environment to default to Piper and match the local
+  development `.env` layout.
+- Changed the default Piper speech length scale to `0.75` for faster Mascot
+  speech.
+- Changed token-server TTS proxy fallback metadata so it no longer labels every
+  remote TTS error as Chatterbox-specific.
+- Changed ready UI copy to consistently use Turkish characters and
+  Maskot/Transkript/Sohbet naming.
+- Changed the embedded mentor video controls to remove the covered footer copy
+  and expose a floating end button over the video.
+- Updated local TTS setup docs with the Piper provider option.
+- Pinned the local TTS server to `setuptools<81` so `resemble-perth`
+  watermarking imports remain compatible.
+
 ## [nokta-hoop 0.4.0] - 2026-05-07
 
 ### Added

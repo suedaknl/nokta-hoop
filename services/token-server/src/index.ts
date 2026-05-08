@@ -49,7 +49,11 @@ type TokenResponse = {
 
 type StreamVideoCall = {
   end: () => Promise<unknown>;
+  getOrCreate?: () => Promise<unknown>;
+  goLive?: () => Promise<unknown>;
   listTranscriptions: () => Promise<unknown>;
+  startTranscription?: (options?: { language?: string }) => Promise<unknown>;
+  stopTranscription?: () => Promise<unknown>;
 };
 
 type StreamVideoFacade = {
@@ -87,6 +91,11 @@ type MascotTtsRequestBody = {
   language_id?: string;
 };
 
+type MascotTtsWarmupRequestBody = {
+  texts?: string[];
+  language_id?: string;
+};
+
 type TtsServerResponse = {
   audioPath?: string;
   filename?: string;
@@ -95,7 +104,7 @@ type TtsServerResponse = {
 };
 
 class TranscriptPendingError extends Error {
-  constructor(message = 'Transcript is not ready yet.') {
+  constructor(message = 'Transkript henüz hazır değil.') {
     super(message);
     this.name = 'TranscriptPendingError';
   }
@@ -108,8 +117,16 @@ const apiKey = process.env.STREAM_API_KEY;
 const apiSecret = process.env.STREAM_API_SECRET;
 const allowedOrigins = process.env.ALLOWED_ORIGINS ?? '*';
 const transcriptionLanguage = process.env.STREAM_TRANSCRIPTION_LANGUAGE ?? 'tr';
+const mentorStreamCallType = normalizeCallType(
+  process.env.MENTOR_STREAM_CALL_TYPE ?? 'livestream',
+) || 'livestream';
 const ttsServerUrl = normalizeOptionalUrl(process.env.TTS_SERVER_URL);
 const mascotTtsLanguage = process.env.MASCOT_TTS_LANGUAGE_ID ?? 'tr';
+const remoteTtsProvider = 'tts-server';
+const maxMascotTtsWarmupTexts = Number.parseInt(
+  process.env.MASCOT_TTS_WARMUP_MAX_TEXTS ?? '12',
+  10,
+);
 
 const streamClient =
   apiKey && apiSecret ? new StreamClient(apiKey, apiSecret) : null;
@@ -136,6 +153,7 @@ app.get('/', (_req, res) => {
     mascotDecision: '/mascot/decide',
     escalations: '/escalations',
     mascotTts: '/tts/mascot',
+    mascotTtsWarmup: '/tts/warmup',
     mentorMessages: '/escalations/{id}/messages',
     transcript: '/calls/default/{callId}/transcript',
     export: '/calls/default/{callId}/export?format=md',
@@ -211,7 +229,7 @@ app.post('/tts/mascot', async (req, res): Promise<void> => {
     if (!response.ok) {
       res.status(response.status).json({
         error: await readTtsError(response),
-        provider: 'chatterbox-multilingual',
+        provider: remoteTtsProvider,
       });
       return;
     }
@@ -227,12 +245,45 @@ app.post('/tts/mascot', async (req, res): Promise<void> => {
       audioPath: `/tts/audio/${filename}`,
       filename,
       languageId: ttsBody.languageId ?? mascotTtsLanguage,
-      provider: ttsBody.provider ?? 'chatterbox-multilingual',
+      provider: ttsBody.provider ?? remoteTtsProvider,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'TTS request failed.';
-    res.status(502).json({ error: message, provider: 'chatterbox-multilingual' });
+    res.status(502).json({ error: message, provider: remoteTtsProvider });
   }
+});
+
+app.post('/tts/warmup', (req, res): void => {
+  const body = req.body as MascotTtsWarmupRequestBody;
+  const texts = getMascotWarmupTexts(body.texts);
+
+  if (texts.length === 0) {
+    res.status(400).json({ error: 'No warmup texts provided.' });
+    return;
+  }
+
+  if (!ttsServerUrl) {
+    res.status(503).json({
+      error: 'TTS_SERVER_URL is not configured.',
+      provider: 'device',
+    });
+    return;
+  }
+
+  const languageId =
+    typeof body.language_id === 'string' && body.language_id.trim()
+      ? body.language_id.trim()
+      : mascotTtsLanguage;
+
+  void warmupMascotTts(texts, languageId).catch((error) => {
+    console.warn('Mascot TTS warmup failed:', error);
+  });
+
+  res.status(202).json({
+    count: texts.length,
+    provider: remoteTtsProvider,
+    status: 'queued',
+  });
 });
 
 app.get('/tts/audio/:filename', async (req, res): Promise<void> => {
@@ -310,6 +361,7 @@ app.post('/escalations', (req, res) => {
     requester,
     topic,
     question,
+    callType: mentorStreamCallType,
   });
   escalations.set(request.id, request);
 
@@ -329,7 +381,7 @@ app.get('/escalations/:id', (req, res) => {
   res.json({ escalation: request, inviteText: buildExpertInviteText(request) });
 });
 
-app.post('/escalations/:id/accept', (req, res) => {
+app.post('/escalations/:id/accept', async (req, res): Promise<void> => {
   const request = escalations.get(req.params.id);
   if (!request) {
     res.status(404).json({ error: 'Escalation not found.' });
@@ -363,10 +415,43 @@ app.post('/escalations/:id/accept', (req, res) => {
   };
   escalations.set(accepted.id, accepted);
 
+  await prepareAcceptedEscalationCall(accepted);
+
   res.json({
     escalation: accepted,
     inviteText: buildExpertInviteText(accepted),
   });
+});
+
+app.post('/escalations/:id/cancel', (req, res) => {
+  const request = escalations.get(req.params.id);
+  if (!request) {
+    res.status(404).json({ error: 'Escalation not found.' });
+    return;
+  }
+
+  if (request.status === 'cancelled') {
+    res.json({ escalation: request });
+    return;
+  }
+
+  if (request.status !== 'pending') {
+    res.status(409).json({
+      error: `Escalation is already ${request.status}.`,
+      escalation: request,
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const cancelled: EscalationRequest = {
+    ...request,
+    status: 'cancelled',
+    updatedAt: now,
+  };
+  escalations.set(cancelled.id, cancelled);
+
+  res.json({ escalation: cancelled });
 });
 
 app.post('/escalations/:id/resolve', (req, res) => {
@@ -535,6 +620,92 @@ app.post('/calls/:callType/:callId/end', async (req, res) => {
   }
 });
 
+app.post('/calls/:callType/:callId/go-live', async (req, res) => {
+  const callType = normalizeCallType(req.params.callType ?? '');
+  const callId = normalizeCallId(req.params.callId ?? '');
+
+  if (!callType || !callId) {
+    res.status(400).json({ error: 'Invalid call type or call ID.' });
+    return;
+  }
+
+  try {
+    const call = getStreamVideoCall(callType, callId);
+    if (!call.goLive) {
+      res.status(502).json({ error: 'Stream goLive is not available.' });
+      return;
+    }
+
+    await call.getOrCreate?.();
+    await call.goLive();
+    res.json({
+      callType,
+      callId,
+      status: 'live',
+    });
+  } catch (err) {
+    const { status, message } = normalizeStreamError(err);
+    res.status(status).json({ error: message });
+  }
+});
+
+app.post('/calls/:callType/:callId/start-transcription', async (req, res) => {
+  const callType = normalizeCallType(req.params.callType ?? '');
+  const callId = normalizeCallId(req.params.callId ?? '');
+  const language = getTranscriptionLanguage(req.body);
+
+  if (!callType || !callId) {
+    res.status(400).json({ error: 'Invalid call type or call ID.' });
+    return;
+  }
+
+  try {
+    const call = getStreamVideoCall(callType, callId);
+    if (!call.startTranscription) {
+      res.status(502).json({ error: 'Stream startTranscription is not available.' });
+      return;
+    }
+
+    await call.startTranscription({ language });
+    res.json({
+      callType,
+      callId,
+      status: 'transcribing',
+    });
+  } catch (err) {
+    const { status, message } = normalizeStreamError(err);
+    res.status(status).json({ error: message });
+  }
+});
+
+app.post('/calls/:callType/:callId/stop-transcription', async (req, res) => {
+  const callType = normalizeCallType(req.params.callType ?? '');
+  const callId = normalizeCallId(req.params.callId ?? '');
+
+  if (!callType || !callId) {
+    res.status(400).json({ error: 'Invalid call type or call ID.' });
+    return;
+  }
+
+  try {
+    const call = getStreamVideoCall(callType, callId);
+    if (!call.stopTranscription) {
+      res.status(502).json({ error: 'Stream stopTranscription is not available.' });
+      return;
+    }
+
+    await call.stopTranscription();
+    res.json({
+      callType,
+      callId,
+      status: 'stopped',
+    });
+  } catch (err) {
+    const { status, message } = normalizeStreamError(err);
+    res.status(status).json({ error: message });
+  }
+});
+
 app.get('/calls/:callType/:callId/transcript', async (req, res) => {
   const callType = normalizeCallType(req.params.callType ?? '');
   const callId = normalizeCallId(req.params.callId ?? '');
@@ -648,7 +819,7 @@ async function getReadyTranscript(input: {
   const asset = pickLatestTranscription(extractTranscriptionAssets(response));
 
   if (!asset) {
-    throw new TranscriptPendingError('Transcript is not ready yet.');
+    throw new TranscriptPendingError('Transkript henüz hazır değil.');
   }
 
   const transcript = await fetchTranscriptFromAsset(asset, input);
@@ -658,6 +829,36 @@ async function getReadyTranscript(input: {
   }
 
   return transcript;
+}
+
+async function prepareAcceptedEscalationCall(
+  request: EscalationRequest,
+): Promise<void> {
+  if (request.callType !== 'livestream') {
+    return;
+  }
+
+  try {
+    const call = getStreamVideoCall(request.callType, request.callId);
+    await call.getOrCreate?.();
+    await call.goLive?.();
+  } catch (error) {
+    console.warn('prepare accepted escalation livestream failed:', error);
+  }
+}
+
+function getTranscriptionLanguage(body: unknown): string {
+  if (
+    body &&
+    typeof body === 'object' &&
+    'language' in body &&
+    typeof body.language === 'string' &&
+    body.language.trim()
+  ) {
+    return body.language.trim();
+  }
+
+  return transcriptionLanguage;
 }
 
 function getExportFormat(value: unknown): TranscriptExportFormat | null {
@@ -736,6 +937,59 @@ function getEscalationStatus(value: unknown): EscalationStatus | null {
     return value;
   }
   return null;
+}
+
+function getMascotWarmupTexts(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const texts: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+
+    const text = item.replace(/\s+/g, ' ').trim();
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    seen.add(text);
+    texts.push(text);
+
+    if (texts.length >= maxMascotTtsWarmupTexts) {
+      break;
+    }
+  }
+
+  return texts;
+}
+
+async function warmupMascotTts(
+  texts: string[],
+  languageId: string,
+): Promise<void> {
+  if (!ttsServerUrl) {
+    return;
+  }
+
+  for (const text of texts) {
+    const response = await fetch(`${ttsServerUrl}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language_id: languageId,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readTtsError(response));
+    }
+  }
 }
 
 function getMentorSessionMessageRole(

@@ -28,7 +28,7 @@ export async function requestMascotDecision(input: {
     !body.decision ||
     (body.decision.action !== 'answer' && body.decision.action !== 'escalate')
   ) {
-    throw new Error('Mascot decision response is invalid.');
+    throw new Error('Maskot karar yanıtı geçersiz.');
   }
 
   return body.decision;
@@ -37,8 +37,8 @@ export async function requestMascotDecision(input: {
 async function getResponseMessage(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: string };
-    return body.error ?? `Mascot decision failed: ${response.status}`;
+    return body.error ?? `Maskot kararı başarısız oldu: ${response.status}`;
   } catch {
-    return `Mascot decision failed: ${response.status}`;
+    return `Maskot kararı başarısız oldu: ${response.status}`;
   }
 }

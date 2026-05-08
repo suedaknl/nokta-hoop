@@ -46,7 +46,7 @@ test('formats transcript as text and markdown', () => {
   });
 
   assert.match(formatTranscriptAsText(transcript), /\[00:00\] user-a:/);
-  assert.match(formatTranscriptAsMarkdown(transcript), /# Transcript/);
+  assert.match(formatTranscriptAsMarkdown(transcript), /# Transkript/);
 });
 
 test('picks latest transcription asset with a URL', () => {

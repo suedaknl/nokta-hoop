@@ -56,13 +56,14 @@ mentor is needed.
 
 Never commit the Groq API key.
 
-## 4. Optional: Prepare Chatterbox TTS
+## 4. Optional: Prepare Local TTS
 
-Chatterbox Multilingual is optional. If it is running, the Mascot uses generated
+The local TTS server is optional. If it is running, the Mascot uses generated
 Turkish speech. If it is not running, the app falls back to the phone's own TTS
 engine.
 
-Install Python 3.10 or 3.11. GPU is recommended; CPU may be slow.
+Install Python 3.10 or 3.11. Chatterbox is heavy and GPU is recommended. Piper
+is lighter and better for fast local demos.
 
 From the repository root:
 
@@ -70,6 +71,14 @@ From the repository root:
 npm run tts:install
 copy services\tts-server\.env.example services\tts-server\.env
 ```
+
+Edit `services/tts-server/.env`:
+
+```env
+TTS_PROVIDER=piper
+```
+
+Use `TTS_PROVIDER=chatterbox` if you want to test Chatterbox instead.
 
 Optional voice cloning uses a short clean `.wav` sample:
 
@@ -103,6 +112,7 @@ STREAM_API_KEY=your_stream_api_key
 STREAM_API_SECRET=your_stream_api_secret
 ALLOWED_ORIGINS=*
 STREAM_TRANSCRIPTION_LANGUAGE=tr
+MENTOR_STREAM_CALL_TYPE=livestream
 GROQ_API_KEY=optional_groq_api_key_for_ai_mascot
 GROQ_MODEL=llama-3.3-70b-versatile
 TTS_SERVER_URL=http://127.0.0.1:8790
@@ -133,8 +143,8 @@ Terminal 1:
 npm run tts:dev
 ```
 
-The first request can be slow because Chatterbox downloads and loads model
-weights.
+The first request can be slow because the selected TTS provider downloads and
+loads model weights. Piper is much smaller than Chatterbox.
 
 ## 8. Start The Token Server
 
@@ -262,7 +272,7 @@ Run token server:
 npm run server:dev
 ```
 
-Run Chatterbox TTS server:
+Run local TTS server:
 
 ```powershell
 npm run tts:dev
@@ -333,7 +343,8 @@ Check:
 
 - `npm run tts:dev` is running.
 - `services/token-server/.env` has `TTS_SERVER_URL=http://127.0.0.1:8790`.
-- `apps/mobile/.env` has `EXPO_PUBLIC_MASCOT_TTS_PROVIDER=chatterbox`.
+- `apps/mobile/.env` has `EXPO_PUBLIC_MASCOT_TTS_PROVIDER=chatterbox` or any
+  non-`device` value.
 - token server and Metro were restarted after editing `.env`.
 
 ### Phone cannot connect to development server

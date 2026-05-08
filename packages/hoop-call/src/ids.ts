@@ -1,5 +1,5 @@
 export const DEFAULT_CALL_ID = 'nokta-hoop-demo';
-export const DEFAULT_USER_NAME = 'Nokta User';
+export const DEFAULT_USER_NAME = 'Nokta Kullanıcı';
 
 export const createGuestId = () =>
   `guest-${Math.floor(1000 + Math.random() * 9000)}`;

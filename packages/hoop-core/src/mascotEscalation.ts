@@ -271,14 +271,14 @@ export function buildMentorSessionReturnMessage(input: {
     .slice(0, 4);
 
   if (transcriptLines.length === 0) {
-    return `${expertName} ile mentor oturumu tamamlandi. Kullanici chatten ${formatCompactList(
+    return `${expertName} ile mentor oturumu tamamlandı. Kullanıcı sohbette ${formatCompactList(
       requesterMessages,
-    )} yazdi; transkriptte mentor konusmasi algilanmadi.`;
+    )} yazdı; transkriptte mentor konuşması algılanmadı.`;
   }
 
-  return `${expertName} ile mentor oturumu tamamlandi. Kullanici chatten ${formatCompactList(
+  return `${expertName} ile mentor oturumu tamamlandı. Kullanıcı sohbette ${formatCompactList(
     requesterMessages,
-  )} yazdi. Mentorun konusmasindan notlar: ${transcriptLines.join(' ')}`;
+  )} yazdı. Mentorun konuşmasından notlar: ${transcriptLines.join(' ')}`;
 }
 
 export function normalizeEscalationTopic(value: string): string {

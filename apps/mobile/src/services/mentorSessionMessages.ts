@@ -37,12 +37,12 @@ export async function createMentorSessionMessage(input: {
   );
 
   if (!response.ok) {
-    throw new Error(await getResponseMessage(response, 'Mentor message failed.'));
+    throw new Error(await getResponseMessage(response, 'Mentor mesajı başarısız oldu.'));
   }
 
   const body = (await response.json()) as MentorSessionMessageResponse;
   if (!body.message?.id) {
-    throw new Error('Mentor message response is invalid.');
+    throw new Error('Mentor mesaj yanıtı geçersiz.');
   }
 
   return body.message;
@@ -58,12 +58,12 @@ export async function listMentorSessionMessages(
   );
 
   if (!response.ok) {
-    throw new Error(await getResponseMessage(response, 'Mentor messages failed.'));
+    throw new Error(await getResponseMessage(response, 'Mentor mesajları yüklenemedi.'));
   }
 
   const body = (await response.json()) as MentorSessionMessageListResponse;
   if (!Array.isArray(body.messages)) {
-    throw new Error('Mentor messages response is invalid.');
+    throw new Error('Mentor mesajları yanıtı geçersiz.');
   }
 
   return body.messages;

@@ -40,12 +40,12 @@ export async function listEscalations(input: {
   const response = await fetch(`${getTokenServerUrl()}/escalations${query}`);
 
   if (!response.ok) {
-    throw new Error(await getResponseMessage(response, 'Escalation list failed.'));
+    throw new Error(await getResponseMessage(response, 'Mentor isteği listesi yüklenemedi.'));
   }
 
   const body = (await response.json()) as EscalationListResponse;
   if (!Array.isArray(body.escalations)) {
-    throw new Error('Escalation list response is invalid.');
+    throw new Error('Mentor isteği listesi yanıtı geçersiz.');
   }
 
   return body.escalations;
@@ -83,6 +83,19 @@ export async function acceptEscalation(input: {
   return readEscalationResponse(response);
 }
 
+export async function cancelEscalation(
+  escalationId: string,
+): Promise<EscalationRequest> {
+  const response = await fetch(
+    `${getTokenServerUrl()}/escalations/${encodeURIComponent(
+      escalationId,
+    )}/cancel`,
+    { method: 'POST' },
+  );
+
+  return readEscalationResponse(response);
+}
+
 export async function resolveEscalation(
   escalationId: string,
 ): Promise<EscalationRequest> {
@@ -100,12 +113,12 @@ async function readEscalationResponse(
   response: Response,
 ): Promise<EscalationRequest> {
   if (!response.ok) {
-    throw new Error(await getResponseMessage(response, 'Escalation request failed.'));
+    throw new Error(await getResponseMessage(response, 'Mentor isteği başarısız oldu.'));
   }
 
   const body = (await response.json()) as EscalationResponse;
   if (!body.escalation?.id) {
-    throw new Error('Escalation response is invalid.');
+    throw new Error('Mentor isteği yanıtı geçersiz.');
   }
 
   return body.escalation;

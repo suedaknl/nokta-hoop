@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   videoWrap: {
-    height: 260,
+    height: 360,
     paddingHorizontal: 18,
   },
   videoSurface: {

@@ -3,7 +3,10 @@ import type {
   MascotChatMessage,
 } from '@nokta-hoop/hoop-core';
 import type { Call } from '@stream-io/video-client';
-import type { StreamVideoClient } from '@stream-io/video-react-native-sdk';
+import {
+  callManager,
+  type StreamVideoClient,
+} from '@stream-io/video-react-native-sdk';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -47,6 +50,7 @@ type MascotScreenProps = {
     onCallEnded: () => Promise<void>;
     onEnd: () => Promise<void>;
   } | null;
+  onCancelExpertRequest: () => Promise<void>;
   onConfirmExpertOffer: () => Promise<void>;
   onResetChat: () => void;
   onSendMessage: (message: string) => Promise<void>;
@@ -66,6 +70,7 @@ export function MascotScreen({
   pendingExpertOffer,
   speaking,
   mentorLive,
+  onCancelExpertRequest,
   onConfirmExpertOffer,
   onResetChat,
   onSendMessage,
@@ -78,6 +83,7 @@ export function MascotScreen({
   const [showChat, setShowChat] = useState(true);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [showEscalationNotice, setShowEscalationNotice] = useState(false);
   const submittedVoiceRef = useRef<string | null>(null);
   const chatRef = useRef<ScrollView>(null);
   const mentorMode = Boolean(mentorLive);
@@ -107,12 +113,31 @@ export function MascotScreen({
   }, [messages.length]);
 
   useEffect(() => {
-    if ((conversationLocked || mentorMode) && listening) {
+    if (!activeEscalation) {
+      setShowEscalationNotice(false);
+      return;
+    }
+
+    setShowEscalationNotice(true);
+
+    if (activeEscalation.status !== 'accepted') {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowEscalationNotice(false);
+    }, 4200);
+
+    return () => clearTimeout(timer);
+  }, [activeEscalation?.id, activeEscalation?.status]);
+
+  useEffect(() => {
+    if (conversationLocked && listening) {
       ExpoSpeechRecognitionModule.stop();
       setListening(false);
       setVoiceTranscript('');
     }
-  }, [conversationLocked, listening, mentorMode]);
+  }, [conversationLocked, listening]);
 
   useEffect(() => {
     if (!showChat) {
@@ -133,6 +158,9 @@ export function MascotScreen({
 
   useSpeechRecognitionEvent('end', () => {
     setListening(false);
+    if (mentorMode) {
+      activateMentorViewerAudio();
+    }
   });
 
   useSpeechRecognitionEvent('result', (event) => {
@@ -147,7 +175,6 @@ export function MascotScreen({
     if (
       event.isFinal &&
       !conversationLocked &&
-      !mentorMode &&
       submittedVoiceRef.current !== transcript
     ) {
       submittedVoiceRef.current = transcript;
@@ -160,6 +187,9 @@ export function MascotScreen({
 
   useSpeechRecognitionEvent('error', (event) => {
     setListening(false);
+    if (mentorMode) {
+      activateMentorViewerAudio();
+    }
     setVoiceError(event.message || 'Ses tanıma başarısız oldu.');
   });
 
@@ -212,12 +242,15 @@ export function MascotScreen({
   };
 
   const toggleListening = async () => {
-    if (busy || conversationLocked || mentorMode) {
+    if (busy || conversationLocked) {
       return;
     }
 
     if (listening) {
       ExpoSpeechRecognitionModule.stop();
+      if (mentorMode) {
+        activateMentorViewerAudio();
+      }
       return;
     }
 
@@ -229,6 +262,10 @@ export function MascotScreen({
     if (!permission.granted) {
       setVoiceError('Mikrofon veya konuşma tanıma izni verilmedi.');
       return;
+    }
+
+    if (mentorMode) {
+      suspendMentorViewerAudio();
     }
 
     ExpoSpeechRecognitionModule.start({
@@ -256,7 +293,7 @@ export function MascotScreen({
         onFocus={() => setShowChat(true)}
         placeholder={
           conversationLocked
-            ? 'Transcript hazırlanıyor...'
+            ? 'Transkript hazırlanıyor...'
             : mentorMode
               ? 'Mentora yaz...'
               : 'Fikrini yaz...'
@@ -279,24 +316,24 @@ export function MascotScreen({
       >
         <Text style={styles.sendButtonText}>Gönder</Text>
       </Pressable>
-      {!mentorMode ? (
-        <Pressable
-          accessibilityLabel={listening ? 'Dinlemeyi durdur' : 'Mikrofonu aç'}
-          accessibilityRole="button"
-          disabled={busy || conversationLocked}
-          onPress={() => void toggleListening()}
-          style={({ pressed }) => [
-            styles.composerMicButton,
-            listening ? styles.composerMicButtonActive : null,
-            busy || conversationLocked ? styles.disabledButton : null,
-            pressed && !busy && !conversationLocked ? styles.buttonPressed : null,
-          ]}
-        >
-          <MicrophoneIcon />
-        </Pressable>
-      ) : null}
+      <Pressable
+        accessibilityLabel={listening ? 'Dinlemeyi durdur' : 'Mikrofonu aç'}
+        accessibilityRole="button"
+        disabled={busy || conversationLocked}
+        onPress={() => void toggleListening()}
+        style={({ pressed }) => [
+          styles.composerMicButton,
+          listening ? styles.composerMicButtonActive : null,
+          busy || conversationLocked ? styles.disabledButton : null,
+          pressed && !busy && !conversationLocked ? styles.buttonPressed : null,
+        ]}
+      >
+        <MicrophoneIcon />
+      </Pressable>
     </View>
   );
+  const shouldShowEscalationNotice =
+    Boolean(activeEscalation) && showEscalationNotice && !conversationLocked;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -305,10 +342,62 @@ export function MascotScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboard}
       >
+        {shouldShowEscalationNotice || conversationLocked ? (
+          <View style={styles.statusStack}>
+            {conversationLocked ? (
+              <View style={styles.lockPanel}>
+                <ActivityIndicator color="#2563eb" />
+                <View style={styles.lockCopy}>
+                  <Text style={styles.lockTitle}>Transkript hazırlanıyor</Text>
+                  <Text style={styles.lockText}>
+                    {lockMessage ??
+                      'Uzman görüşmesi işleniyor. Hazır olana kadar maskot konuşması bekletiliyor.'}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {shouldShowEscalationNotice && activeEscalation ? (
+              <View style={styles.escalationPanel}>
+                <Text style={styles.escalationTitle}>
+                  {mentorMode
+                    ? 'Mentor canlı'
+                    : activeEscalation.status === 'accepted'
+                      ? 'Mentor kabul etti'
+                      : 'Mentor bekleniyor'}
+                </Text>
+                <Text numberOfLines={2} style={styles.escalationText}>
+                  {activeEscalation.topic}
+                </Text>
+                {activeEscalation.status === 'pending' ? (
+                  <View style={styles.pendingRow}>
+                    <View style={styles.pendingStatus}>
+                      <ActivityIndicator color="#2563eb" />
+                      <Text style={styles.pendingText}>Uzman yanıtı bekleniyor</Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={busy}
+                      onPress={() => void onCancelExpertRequest()}
+                      style={({ pressed }) => [
+                        styles.pendingCancelButton,
+                        busy ? styles.disabledButton : null,
+                        pressed && !busy ? styles.buttonPressed : null,
+                      ]}
+                    >
+                      <Text style={styles.pendingCancelText}>İptal</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={styles.topBar}>
           <View style={styles.brand}>
             <Text style={styles.eyebrow}>nokta-hoop</Text>
-            <Text style={styles.title}>Nokta Mascot</Text>
+            <Text style={styles.title}>Nokta Maskot</Text>
           </View>
           <View style={styles.topActions}>
             <Pressable
@@ -326,7 +415,7 @@ export function MascotScreen({
           </View>
         </View>
 
-        <View style={styles.avatarStage}>
+        <View style={[styles.avatarStage, mentorMode ? styles.avatarStageMentor : null]}>
           <View style={styles.avatarFrame}>
             {mentorLive ? (
               <MentorLivePanel
@@ -334,7 +423,6 @@ export function MascotScreen({
                 client={mentorLive.client}
                 leaving={mentorLive.leaving}
                 onCallEnded={mentorLive.onCallEnded}
-                onEnd={mentorLive.onEnd}
                 statusText={mentorLive.statusText}
               />
             ) : (
@@ -343,43 +431,30 @@ export function MascotScreen({
           </View>
         </View>
 
-        {activeEscalation ? (
-          <View style={styles.escalationPanel}>
-            <Text style={styles.escalationTitle}>
-              {mentorMode
-                ? 'Mentor canlı'
-                : activeEscalation.status === 'accepted'
-                  ? 'Mentor kabul etti'
-                  : 'Mentor bekleniyor'}
+        {mentorLive ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={mentorLive.leaving}
+            onPress={() => void mentorLive.onEnd()}
+            style={({ pressed }) => [
+              styles.mentorEndFloatingButton,
+              mentorLive.leaving ? styles.disabledButton : null,
+              pressed && !mentorLive.leaving ? styles.buttonPressed : null,
+            ]}
+          >
+            <Text style={styles.mentorEndFloatingText}>
+              {mentorLive.leaving ? 'Bitiyor...' : 'Bitir'}
             </Text>
-            <Text numberOfLines={2} style={styles.escalationText}>
-              {activeEscalation.topic}
-            </Text>
-            {activeEscalation.status === 'pending' ? (
-              <View style={styles.pendingRow}>
-                <ActivityIndicator color="#2563eb" />
-                <Text style={styles.pendingText}>Uzman yanıtı bekleniyor</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {conversationLocked ? (
-          <View style={styles.lockPanel}>
-            <ActivityIndicator color="#2563eb" />
-            <View style={styles.lockCopy}>
-              <Text style={styles.lockTitle}>Transcript hazırlanıyor</Text>
-              <Text style={styles.lockText}>
-                {lockMessage ??
-                  'Uzman görüşmesi işleniyor. Hazır olana kadar maskot konuşması bekletiliyor.'}
-              </Text>
-            </View>
-          </View>
+          </Pressable>
         ) : null}
 
         <View
           pointerEvents={showChat ? 'auto' : 'none'}
-          style={[styles.chatOverlay, showChat ? styles.chatOverlayActive : null]}
+          style={[
+            styles.chatOverlay,
+            mentorMode ? styles.chatOverlayMentor : null,
+            showChat ? styles.chatOverlayActive : null,
+          ]}
         >
           <View style={styles.chatHeader}>
             <Text style={styles.chatTitle}>Konuşma</Text>
@@ -426,7 +501,7 @@ export function MascotScreen({
                   {listening ? 'Dinliyorum...' : 'Ses algılandı'}
                 </Text>
                 <Text style={styles.voiceText}>
-                  {voiceTranscript || 'Mascot ile konuşmaya başla.'}
+                  {voiceTranscript || 'Maskot ile konuşmaya başla.'}
                 </Text>
               </View>
             </View>
@@ -452,7 +527,7 @@ export function MascotScreen({
                     ? 'Sen'
                     : message.role === 'system'
                       ? 'Sistem'
-                      : 'Mascot'}
+                      : 'Maskot'}
                 </Text>
                 <Text style={styles.messageText}>{message.text}</Text>
               </View>
@@ -507,7 +582,7 @@ export function MascotScreen({
                   pressed ? styles.buttonPressed : null,
                 ]}
               >
-                <Text style={styles.actionButtonText}>Transcript</Text>
+                <Text style={styles.actionButtonText}>Transkript</Text>
               </Pressable>
             ) : null}
           </View>
@@ -519,7 +594,7 @@ export function MascotScreen({
               multiline
               onChangeText={setDraft}
               placeholder={
-                conversationLocked ? 'Transcript hazırlanıyor...' : 'Fikrini yaz...'
+                conversationLocked ? 'Transkript hazırlanıyor...' : 'Fikrini yaz...'
               }
               placeholderTextColor="#9ca3af"
               style={styles.input}
@@ -537,7 +612,7 @@ export function MascotScreen({
               ]}
             >
               <Text style={styles.composerMicButtonText}>
-                {listening ? 'Dur' : 'Mic'}
+                {listening ? 'Dur' : 'Mikrofon'}
               </Text>
             </Pressable>
             <Pressable
@@ -569,7 +644,7 @@ export function MascotScreen({
                 pressed ? styles.buttonPressed : null,
               ]}
             >
-              <Text style={styles.compactChatButtonText}>Chat</Text>
+              <Text style={styles.compactChatButtonText}>Sohbet</Text>
             </Pressable>
             {renderComposer(true)}
           </View>
@@ -577,6 +652,22 @@ export function MascotScreen({
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function suspendMentorViewerAudio() {
+  try {
+    callManager.stop();
+  } catch (error) {
+    console.warn('mentor viewer audio suspend failed:', error);
+  }
+}
+
+function activateMentorViewerAudio() {
+  try {
+    callManager.stop();
+  } catch (error) {
+    console.warn('mentor viewer audio restore failed:', error);
+  }
 }
 
 function MicrophoneIcon() {
@@ -650,7 +741,7 @@ function getStatusText({
   speaking: boolean;
 }) {
   if (conversationLocked) {
-    return lockMessage ?? 'Transcript hazırlanıyor.';
+    return lockMessage ?? 'Transkript hazırlanıyor.';
   }
 
   if (listening) {
@@ -666,7 +757,7 @@ function getStatusText({
   }
 
   if (mentorMode) {
-    return 'Mentor canli. Sorunu chatten yaz.';
+    return 'Mentor canlı. Sorunu sohbetten yaz.';
   }
 
   if (activeEscalation?.status === 'accepted') {
@@ -689,6 +780,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  statusStack: {
+    gap: 8,
+    left: 16,
+    position: 'absolute',
+    right: 16,
+    top: 32,
+    zIndex: 20,
+    elevation: 20,
   },
   topBar: {
     alignItems: 'center',
@@ -742,9 +842,32 @@ const styles = StyleSheet.create({
     minHeight: 390,
     zIndex: 2,
   },
+  avatarStageMentor: {
+    marginBottom: 310,
+    marginTop: 8,
+  },
   avatarFrame: {
     height: '100%',
     width: '100%',
+  },
+  mentorEndFloatingButton: {
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    bottom: 328,
+    elevation: 16,
+    justifyContent: 'center',
+    minHeight: 36,
+    minWidth: 60,
+    paddingHorizontal: 10,
+    position: 'absolute',
+    right: 16,
+    zIndex: 16,
+  },
+  mentorEndFloatingText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
   },
   escalationPanel: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
@@ -752,12 +875,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     gap: 4,
-    left: 16,
     padding: 12,
-    position: 'absolute',
-    right: 16,
-    top: 86,
-    zIndex: 5,
   },
   escalationTitle: {
     color: '#1d4ed8',
@@ -773,12 +891,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+    justifyContent: 'space-between',
     paddingTop: 2,
+  },
+  pendingStatus: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+    gap: 8,
   },
   pendingText: {
     color: '#2563eb',
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '800',
+  },
+  pendingCancelButton: {
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 32,
+    paddingHorizontal: 14,
+  },
+  pendingCancelText: {
+    color: '#1d4ed8',
+    fontSize: 12,
+    fontWeight: '900',
   },
   lockPanel: {
     alignItems: 'center',
@@ -788,12 +929,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
-    left: 16,
     padding: 12,
-    position: 'absolute',
-    right: 16,
-    top: 86,
-    zIndex: 6,
   },
   lockCopy: {
     flex: 1,
@@ -824,6 +960,9 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: 18 }],
     zIndex: 8,
+  },
+  chatOverlayMentor: {
+    top: '64%',
   },
   chatOverlayActive: {
     opacity: 1,

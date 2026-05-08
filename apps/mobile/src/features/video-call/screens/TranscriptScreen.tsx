@@ -45,11 +45,11 @@ export function TranscriptScreen({
   const title =
     status === 'ready' && transcript
       ? hasTranscriptLines
-        ? `${transcript.items.length} transcript lines`
+        ? `${transcript.items.length} transkript satırı`
         : 'Konuşma bulunamadı'
       : isWaiting
-        ? 'Transcript loading'
-      : 'Transcript';
+        ? 'Transkript yükleniyor'
+      : 'Transkript';
 
   const exportTranscript = async (format: TranscriptExportFormat) => {
     if (!transcript) {
@@ -66,8 +66,8 @@ export function TranscriptScreen({
       await Linking.openURL(url);
     } catch (error) {
       Alert.alert(
-        'Export failed',
-        error instanceof Error ? error.message : 'Transcript export failed.',
+        'Dışa aktarma başarısız',
+        error instanceof Error ? error.message : 'Transkript dışa aktarılamadı.',
       );
     }
   };
@@ -77,7 +77,7 @@ export function TranscriptScreen({
       <StatusBar style="light" />
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={styles.backButtonText}>Geri</Text>
         </Pressable>
         <Text style={styles.roomText}>{callId}</Text>
         <Text style={styles.title}>{title}</Text>
@@ -91,7 +91,7 @@ export function TranscriptScreen({
         {transcript ? (
           <>
             <View style={styles.exportPanel}>
-              <Text style={styles.exportTitle}>Download transcript</Text>
+              <Text style={styles.exportTitle}>Transkripti indir</Text>
               <View style={styles.exportActions}>
                 <Pressable
                   accessibilityRole="button"
@@ -156,19 +156,19 @@ export function TranscriptScreen({
             ) : null}
             <Text style={styles.emptyTitle}>
               {isWaiting
-                ? 'Preparing transcript'
+                ? 'Transkript hazırlanıyor'
                 : status === 'failed'
-                  ? 'Transcript failed'
-                  : 'Transcript pending'}
+                  ? 'Transkript alınamadı'
+                  : 'Transkript bekleniyor'}
             </Text>
             <Text style={styles.emptyMessage}>
               {message ??
                 (isWaiting
-                  ? 'Stream is processing the call transcript. Please wait on this screen.'
-                  : 'Transcript will appear here after Stream finishes processing.')}
+                  ? 'Stream oturum transkriptini işliyor. Lütfen bu ekranda bekleyin.'
+                  : 'Stream işlemeyi bitirince transkript burada görünecek.')}
             </Text>
             {isWaiting ? (
-              <Text style={styles.waitHint}>This can take a few moments after ending the call.</Text>
+              <Text style={styles.waitHint}>Oturum bittikten sonra bu işlem biraz sürebilir.</Text>
             ) : null}
           </View>
         )}
@@ -185,7 +185,7 @@ export function TranscriptScreen({
           ]}
         >
           <Text style={styles.secondaryButtonText}>
-            {refreshing ? 'Checking...' : 'Refresh'}
+            {refreshing ? 'Kontrol ediliyor...' : 'Yenile'}
           </Text>
         </Pressable>
         <Pressable
@@ -197,7 +197,7 @@ export function TranscriptScreen({
             pressed && !refreshing ? styles.buttonPressed : null,
           ]}
         >
-          <Text style={styles.primaryButtonText}>New call</Text>
+          <Text style={styles.primaryButtonText}>Yeni oturum</Text>
         </Pressable>
       </View>
     </SafeAreaView>

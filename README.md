@@ -142,6 +142,7 @@ STREAM_API_KEY=your_stream_api_key
 STREAM_API_SECRET=your_stream_api_secret
 ALLOWED_ORIGINS=*
 STREAM_TRANSCRIPTION_LANGUAGE=tr
+MENTOR_STREAM_CALL_TYPE=livestream
 GROQ_API_KEY=optional_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
 TTS_SERVER_URL=http://127.0.0.1:8790

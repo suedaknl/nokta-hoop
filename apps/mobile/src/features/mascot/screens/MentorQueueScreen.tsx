@@ -34,10 +34,10 @@ export function MentorQueueScreen({
       <StatusBar style="light" />
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={styles.backButtonText}>Geri</Text>
         </Pressable>
-        <Text style={styles.eyebrow}>human support</Text>
-        <Text style={styles.title}>Mentor queue</Text>
+        <Text style={styles.eyebrow}>insan desteği</Text>
+        <Text style={styles.title}>Mentor kuyruğu</Text>
       </View>
 
       <View style={styles.toolbar}>
@@ -52,7 +52,7 @@ export function MentorQueueScreen({
           ]}
         >
           <Text style={styles.refreshButtonText}>
-            {loading ? 'Refreshing...' : 'Refresh'}
+            {loading ? 'Yenileniyor...' : 'Yenile'}
           </Text>
         </Pressable>
       </View>
@@ -67,15 +67,15 @@ export function MentorQueueScreen({
         {loading && requests.length === 0 ? (
           <View style={styles.emptyState}>
             <ActivityIndicator color="#7dd3fc" />
-            <Text style={styles.emptyText}>Loading mentor requests...</Text>
+            <Text style={styles.emptyText}>Mentor istekleri yükleniyor...</Text>
           </View>
         ) : null}
 
         {!loading && requests.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No pending requests</Text>
+            <Text style={styles.emptyTitle}>Bekleyen istek yok</Text>
             <Text style={styles.emptyText}>
-              Mascot escalation requests will appear here.
+              Maskot mentor istekleri burada görünecek.
             </Text>
           </View>
         ) : null}
@@ -89,10 +89,10 @@ export function MentorQueueScreen({
                 <Text style={styles.statusPill}>{request.status}</Text>
               </View>
               <Text style={styles.requester}>
-                {request.requester.name} needs mentor support.
+                {request.requester.name} mentor desteği istiyor.
               </Text>
               <Text style={styles.question}>{request.question}</Text>
-              <Text style={styles.room}>Room: {request.callId}</Text>
+              <Text style={styles.room}>Oturum: {request.callId}</Text>
               <Pressable
                 accessibilityRole="button"
                 disabled={accepting || request.status !== 'pending'}
@@ -107,7 +107,7 @@ export function MentorQueueScreen({
               >
                 {accepting ? <ActivityIndicator color="#ffffff" /> : null}
                 <Text style={styles.acceptButtonText}>
-                  {accepting ? 'Accepting...' : 'Accept and join'}
+                  {accepting ? 'Kabul ediliyor...' : 'Kabul et ve katıl'}
                 </Text>
               </Pressable>
             </View>

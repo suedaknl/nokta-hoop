@@ -1,8 +1,9 @@
 # Nokta Hoop TTS Server
 
-Local Chatterbox Multilingual text-to-speech service for Mascot responses.
-The mobile app does not talk to this service directly. The token server proxies
-requests so the app can keep using the same public token-server URL.
+Local text-to-speech service for Mascot responses. It supports Chatterbox
+Multilingual and Piper. The mobile app does not talk to this service directly.
+The token server proxies requests so the app can keep using the same public
+token-server URL.
 
 ## Setup
 
@@ -15,8 +16,21 @@ Copy-Item .env.example .env
 python src\main.py
 ```
 
-The first synthesis downloads and loads Chatterbox model weights, so it can take
-time. GPU is strongly recommended. CPU can work for testing but may be slow.
+Use Chatterbox for a heavier multilingual model with optional voice cloning:
+
+```env
+TTS_PROVIDER=chatterbox
+```
+
+Use Piper for a much lighter local Turkish voice:
+
+```env
+TTS_PROVIDER=piper
+```
+
+The first synthesis downloads and loads the selected model. Chatterbox is much
+heavier and GPU is strongly recommended. Piper is smaller and is better for
+fast local demos.
 
 Optional voice cloning:
 

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
   ParticipantView,
   StreamCall,
@@ -16,7 +16,6 @@ type MentorLivePanelProps = {
   leaving: boolean;
   statusText: string | null;
   onCallEnded: () => Promise<void>;
-  onEnd: () => Promise<void>;
 };
 
 export function MentorLivePanel({
@@ -25,44 +24,18 @@ export function MentorLivePanel({
   leaving,
   statusText,
   onCallEnded,
-  onEnd,
 }: MentorLivePanelProps) {
-  const callEnded = useCallEndedEffect({
+  useCallEndedEffect({
     call,
     disabled: leaving,
     onCallEnded,
   });
-
-  const endSession = async () => {
-    callEnded.markHandled();
-    await onEnd();
-  };
 
   return (
     <StreamVideo client={client}>
       <StreamCall call={call}>
         <View style={styles.panel}>
           <MentorVideoSurface leaving={leaving} statusText={statusText} />
-          <View style={styles.footer}>
-            <View style={styles.copy}>
-              <Text style={styles.eyebrow}>Mentor canlı</Text>
-              <Text style={styles.title}>Sorunu chatten yaz</Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              disabled={leaving}
-              onPress={() => void endSession()}
-              style={({ pressed }) => [
-                styles.endButton,
-                leaving ? styles.disabledButton : null,
-                pressed && !leaving ? styles.buttonPressed : null,
-              ]}
-            >
-              <Text style={styles.endButtonText}>
-                {leaving ? 'Bitiyor...' : 'Bitir'}
-              </Text>
-            </Pressable>
-          </View>
         </View>
       </StreamCall>
     </StreamVideo>
@@ -157,48 +130,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     textAlign: 'center',
-  },
-  footer: {
-    minHeight: 64,
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-  },
-  copy: {
-    flex: 1,
-    gap: 2,
-  },
-  eyebrow: {
-    color: '#2563eb',
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: '#111827',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  endButton: {
-    minHeight: 40,
-    minWidth: 72,
-    borderRadius: 12,
-    backgroundColor: '#dc2626',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  endButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  buttonPressed: {
-    opacity: 0.82,
   },
 });

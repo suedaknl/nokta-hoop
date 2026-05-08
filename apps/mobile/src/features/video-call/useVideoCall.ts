@@ -1,11 +1,15 @@
 import { useRef, useState } from 'react';
 import type { Call } from '@stream-io/video-client';
-import { StreamVideoClient } from '@stream-io/video-react-native-sdk';
+import {
+  callManager,
+  StreamVideoClient,
+} from '@stream-io/video-react-native-sdk';
 import {
   DEFAULT_CALL_ID,
   DEFAULT_USER_NAME,
   createGuestId,
   normalizeCallId,
+  normalizeCallType,
   normalizeUserId,
   type CallTranscript,
 } from '@nokta-hoop/hoop-call';
@@ -30,7 +34,12 @@ import {
   isTranscriptNotReadyError,
   requestCallTranscript,
 } from '../../services/transcript';
-import { requestEndCall } from '../../services/calls';
+import {
+  requestEndCall,
+  requestStartCallTranscription,
+  requestStartLivestream,
+  requestStopCallTranscription,
+} from '../../services/calls';
 
 const API_KEY = process.env.EXPO_PUBLIC_STREAM_API_KEY;
 const ENABLE_TRANSCRIPTION =
@@ -43,11 +52,16 @@ type TranscriptionCall = Call & {
   stopTranscription: () => Promise<unknown>;
 };
 
+type LivestreamCall = Call & {
+  goLive?: () => Promise<unknown>;
+};
+
 export function useVideoCall() {
   const [joinStatus, setJoinStatus] = useState<JoinStatus>('idle');
   const [userName, setUserName] = useState<string>(DEFAULT_USER_NAME);
   const [userId, setUserId] = useState<string>(() => createGuestId());
   const [callId, setCallId] = useState<string>(DEFAULT_CALL_ID);
+  const [callType, setCallType] = useState<string>(CALL_TYPE);
   const [client, setClient] = useState<StreamVideoClient | null>(null);
   const [call, setCall] = useState<Call | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +87,11 @@ export function useVideoCall() {
       }
     }
     try {
+      callManager.stop();
+    } catch (e) {
+      console.warn('call manager stop failed:', e);
+    }
+    try {
       await currentClient?.disconnectUser(5_000);
     } catch (e) {
       console.warn('disconnectUser failed:', e);
@@ -85,7 +104,7 @@ export function useVideoCall() {
   };
 
   const join = async (
-    input: { callId?: string; mediaMode?: JoinMediaMode } = {},
+    input: { callId?: string; callType?: string; mediaMode?: JoinMediaMode } = {},
   ) => {
     if (joinStatus !== 'idle' || (client && call)) {
       return false;
@@ -121,6 +140,8 @@ export function useVideoCall() {
 
     const user: DemoUser = { id: nextUserId, name: nextUserName };
     const targetCallId = normalizeCallId(input.callId ?? callId) || DEFAULT_CALL_ID;
+    const targetCallType =
+      normalizeCallType(input.callType ?? callType) || CALL_TYPE;
     const tokenProvider = async () =>
       withTimeout(
         requestStreamToken(user.id, user.name),
@@ -138,24 +159,36 @@ export function useVideoCall() {
       });
 
       setStatusText('Joining call...');
-      nextCall = nextClient.call(CALL_TYPE, targetCallId);
+      nextCall = nextClient.call(targetCallType, targetCallId);
       await withTimeout(
-        nextCall.join({
-          create: true,
-          video: input.mediaMode === 'mentor',
+        joinStreamCall(nextCall, {
+          callType: targetCallType,
+          mediaMode: input.mediaMode ?? 'default',
         }),
         CALL_JOIN_TIMEOUT_MS,
         'Stream call join timed out. Check internet access, Stream app settings, and Metro logs.',
       );
 
       await configureCallMedia(nextCall, input.mediaMode ?? 'default');
-      await startCallTranscription(nextCall);
+      await startLivestreamIfNeeded(
+        nextCall,
+        targetCallType,
+        targetCallId,
+        input.mediaMode ?? 'default',
+      );
+      await startCallTranscription(
+        nextCall,
+        targetCallType,
+        targetCallId,
+        input.mediaMode ?? 'default',
+      );
 
       setClient(nextClient);
       setCall(nextCall);
       setUserName(nextUserName);
       setUserId(nextUserId);
       setCallId(targetCallId);
+      setCallType(targetCallType);
       setStatusText(null);
       setJoinStatus('idle');
       return true;
@@ -180,23 +213,25 @@ export function useVideoCall() {
     const targetCall = call;
     const targetClient = client;
     const targetCallId = callId;
+    const targetCallType = callType;
     setJoinStatus('leaving');
-    setStatusText('Stopping transcription...');
+    setStatusText('Transkripsiyon durduruluyor...');
     setTranscriptStatus('processing');
-    setTranscriptMessage('Transcript is being prepared.');
+    setTranscriptMessage('Transkript hazırlanıyor.');
 
     try {
-      await stopCallTranscription(targetCall);
+      await stopCallTranscription(targetCall, targetCallType, targetCallId);
       if (options.endCall !== false) {
-        setStatusText('Ending call for everyone...');
-        await endCallForEveryone(targetCall, targetCallId);
+        setStatusText('Oturum herkes için kapatılıyor...');
+        await endCallForEveryone(targetCall, targetCallType, targetCallId);
       }
     } finally {
       await cleanupConnection(targetCall, targetClient);
     }
 
-    setStatusText('Waiting for transcript...');
+    setStatusText('Transkript bekleniyor...');
     const result = await pollTranscript(
+      targetCallType,
       targetCallId,
       options.transcriptPollAttempts,
     );
@@ -206,8 +241,8 @@ export function useVideoCall() {
 
   const refreshTranscript = async (): Promise<LeaveResult> => {
     setTranscriptStatus('processing');
-    setTranscriptMessage('Checking transcript status...');
-    return pollTranscript(callId, 1);
+    setTranscriptMessage('Transkript durumu kontrol ediliyor...');
+    return pollTranscript(callType, callId, 1);
   };
 
   const newCallId = () => {
@@ -229,9 +264,26 @@ export function useVideoCall() {
     setStatusText(null);
   };
 
-  const startCallTranscription = async (targetCall: Call) => {
-    if (!ENABLE_TRANSCRIPTION) {
+  const startCallTranscription = async (
+    targetCall: Call,
+    targetCallType: string,
+    targetCallId: string,
+    mediaMode: JoinMediaMode,
+  ) => {
+    if (!ENABLE_TRANSCRIPTION || mediaMode === 'requester') {
       return;
+    }
+
+    try {
+      await requestStartCallTranscription({
+        callId: targetCallId,
+        callType: targetCallType,
+        language: TRANSCRIPTION_LANGUAGE,
+      });
+      transcriptionStartedRef.current = true;
+      return;
+    } catch (serverError) {
+      console.warn('server startTranscription failed:', serverError);
     }
 
     try {
@@ -244,8 +296,35 @@ export function useVideoCall() {
       console.warn('startTranscription failed:', transcriptionError);
       setTranscriptStatus('failed');
       setTranscriptMessage(
-        'Transcription could not be started. Check Stream transcription settings.',
+        'Transkripsiyon başlatılamadı. Stream transkripsiyon ayarlarını kontrol edin.',
       );
+    }
+  };
+
+  const startLivestreamIfNeeded = async (
+    targetCall: Call,
+    targetCallType: string,
+    targetCallId: string,
+    mediaMode: JoinMediaMode,
+  ) => {
+    if (targetCallType !== 'livestream' || mediaMode !== 'mentor') {
+      return;
+    }
+
+    try {
+      await requestStartLivestream({
+        callId: targetCallId,
+        callType: targetCallType,
+      });
+      return;
+    } catch (serverError) {
+      console.warn('server go-live failed:', serverError);
+    }
+
+    try {
+      await (targetCall as LivestreamCall).goLive?.();
+    } catch (livestreamError) {
+      console.warn('goLive failed:', livestreamError);
     }
   };
 
@@ -257,10 +336,16 @@ export function useVideoCall() {
       if (mediaMode === 'requester') {
         await targetCall.camera.disable(true);
         await targetCall.microphone.disable(true);
+        callManager.stop();
         return;
       }
 
       if (mediaMode === 'mentor') {
+        callManager.stop();
+        callManager.start({
+          audioRole: 'communicator',
+          deviceEndpointType: 'speaker',
+        });
         await targetCall.microphone.enable();
         await targetCall.camera.enable();
       }
@@ -269,9 +354,24 @@ export function useVideoCall() {
     }
   };
 
-  const stopCallTranscription = async (targetCall: Call) => {
+  const stopCallTranscription = async (
+    targetCall: Call,
+    targetCallType: string,
+    targetCallId: string,
+  ) => {
     if (!transcriptionStartedRef.current) {
       return;
+    }
+
+    try {
+      await requestStopCallTranscription({
+        callId: targetCallId,
+        callType: targetCallType,
+      });
+      transcriptionStartedRef.current = false;
+      return;
+    } catch (serverError) {
+      console.warn('server stopTranscription failed:', serverError);
     }
 
     try {
@@ -285,12 +385,13 @@ export function useVideoCall() {
 
   const endCallForEveryone = async (
     targetCall: Call,
+    targetCallType: string,
     targetCallId: string,
   ) => {
     try {
       await requestEndCall({
         callId: targetCallId,
-        callType: CALL_TYPE,
+        callType: targetCallType,
       });
       return;
     } catch (serverError) {
@@ -302,19 +403,20 @@ export function useVideoCall() {
     } catch (clientError) {
       console.warn('client end call failed:', clientError);
       setError(
-        'Call could not be ended for everyone. You may need to leave from the other device too.',
+        'Oturum herkes için kapatılamadı. Diğer cihazdan da çıkmanız gerekebilir.',
       );
     }
   };
 
   const pollTranscript = async (
+    targetCallType: string,
     targetCallId: string,
     attempts = TRANSCRIPT_POLL_ATTEMPTS,
   ): Promise<LeaveResult> => {
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         const readyTranscript = await requestCallTranscript({
-          callType: CALL_TYPE,
+          callType: targetCallType,
           callId: targetCallId,
           language: TRANSCRIPTION_LANGUAGE,
         });
@@ -334,7 +436,7 @@ export function useVideoCall() {
           }
 
           const message =
-            'Transcript is still processing. Use refresh in a few moments.';
+            'Transkript hâlâ hazırlanıyor. Biraz sonra yenileyin.';
           setTranscriptStatus('not_ready');
           setTranscriptMessage(message);
           return {
@@ -347,7 +449,7 @@ export function useVideoCall() {
         const message =
           pollError instanceof Error
             ? pollError.message
-            : 'Transcript request failed.';
+            : 'Transkript isteği başarısız oldu.';
         setTranscriptStatus('failed');
         setTranscriptMessage(message);
         return {
@@ -358,7 +460,7 @@ export function useVideoCall() {
       }
     }
 
-    const message = 'Transcript is still processing.';
+    const message = 'Transkript hâlâ hazırlanıyor.';
     setTranscriptStatus('not_ready');
     setTranscriptMessage(message);
     return {
@@ -371,6 +473,7 @@ export function useVideoCall() {
   return {
     call,
     callId,
+    callType,
     client,
     error,
     joining: joinStatus === 'joining',
@@ -388,6 +491,7 @@ export function useVideoCall() {
     newCallId,
     refreshTranscript,
     setCallId,
+    setCallType,
     setUserId,
     updateUserName,
   };
@@ -419,4 +523,38 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+async function joinStreamCall(
+  targetCall: Call,
+  input: { callType: string; mediaMode: JoinMediaMode },
+): Promise<void> {
+  const shouldRetryBackstage =
+    input.callType === 'livestream' && input.mediaMode === 'requester';
+  const maxAttempts = shouldRetryBackstage ? 8 : 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await targetCall.join({
+        create: true,
+        video: input.mediaMode === 'mentor',
+      });
+      return;
+    } catch (error) {
+      if (
+        !shouldRetryBackstage ||
+        attempt >= maxAttempts ||
+        !isLivestreamBackstageJoinError(error)
+      ) {
+        throw error;
+      }
+
+      await delay(1500);
+    }
+  }
+}
+
+function isLivestreamBackstageJoinError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('JoinBackstage') || message.includes('backstage');
 }

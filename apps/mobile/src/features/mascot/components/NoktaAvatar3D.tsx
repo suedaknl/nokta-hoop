@@ -108,7 +108,7 @@ export function NoktaAvatar3D({ state }: NoktaAvatar3DProps) {
       ) : null}
 
       <Pressable
-        accessibilityLabel="Nokta Mascot"
+        accessibilityLabel="Nokta Maskot"
         accessibilityRole="button"
         onLongPress={() => setReaction('love')}
         onPress={interact}

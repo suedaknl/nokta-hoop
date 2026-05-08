@@ -5,7 +5,7 @@ const TOKEN_SERVER_URL = process.env.EXPO_PUBLIC_TOKEN_SERVER_URL;
 export type TranscriptExportFormat = 'md' | 'txt' | 'json';
 
 export class TranscriptNotReadyError extends Error {
-  constructor(message = 'Transcript is not ready yet.') {
+  constructor(message = 'Transkript henüz hazır değil.') {
     super(message);
     this.name = 'TranscriptNotReadyError';
   }
@@ -27,12 +27,12 @@ export async function requestCallTranscript(input: {
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Transcript request failed: ${response.status}`);
+    throw new Error(message || `Transkript isteği başarısız oldu: ${response.status}`);
   }
 
   const body = (await response.json()) as CallTranscript;
   if (body.status !== 'ready' || !Array.isArray(body.items)) {
-    throw new Error('Transcript response is invalid.');
+    throw new Error('Transkript yanıtı geçersiz.');
   }
 
   return body;
@@ -60,7 +60,7 @@ export function getTranscriptExportUrl(input: {
 
 export function getTokenServerUrl(): string {
   if (!TOKEN_SERVER_URL) {
-    throw new Error('EXPO_PUBLIC_TOKEN_SERVER_URL is not configured');
+    throw new Error('EXPO_PUBLIC_TOKEN_SERVER_URL yapılandırılmamış.');
   }
 
   return TOKEN_SERVER_URL.replace(/\/+$/, '');

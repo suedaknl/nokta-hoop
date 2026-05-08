@@ -120,7 +120,7 @@ export function parseStreamJsonlTranscript(
 
 export function formatTranscriptAsText(transcript: CallTranscript): string {
   if (transcript.items.length === 0) {
-    return 'No transcript lines were found.';
+    return 'Transkript satırı bulunamadı.';
   }
 
   return transcript.items
@@ -133,18 +133,18 @@ export function formatTranscriptAsText(transcript: CallTranscript): string {
 
 export function formatTranscriptAsMarkdown(transcript: CallTranscript): string {
   const lines = [
-    `# Transcript: ${transcript.callType}:${transcript.callId}`,
+    `# Transkript: ${transcript.callType}:${transcript.callId}`,
     '',
-    `- Language: ${transcript.language}`,
-    `- Generated at: ${transcript.generatedAt}`,
-    transcript.sessionId ? `- Session: ${transcript.sessionId}` : null,
+    `- Dil: ${transcript.language}`,
+    `- Oluşturulma zamanı: ${transcript.generatedAt}`,
+    transcript.sessionId ? `- Oturum: ${transcript.sessionId}` : null,
     '',
-    '## Conversation',
+    '## Konuşma',
     '',
   ].filter((line): line is string => line !== null);
 
   if (transcript.items.length === 0) {
-    lines.push('No transcript lines were found.');
+    lines.push('Transkript satırı bulunamadı.');
     return lines.join('\n');
   }
 
