@@ -27,9 +27,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  NoktaAvatar3D,
+  NoktaAvatar,
   type MascotVisualState,
-} from '../components/NoktaAvatar3D';
+} from '../components/NoktaAvatar';
 import { MentorLivePanel } from '../components/MentorLivePanel';
 
 type MascotScreenProps = {
@@ -90,6 +90,7 @@ export function MascotScreen({
 
   const avatarState = getAvatarState({
     activeEscalation,
+    pendingExpertOffer,
     busy,
     conversationLocked,
     error: error ?? voiceError,
@@ -426,7 +427,7 @@ export function MascotScreen({
                 statusText={mentorLive.statusText}
               />
             ) : (
-              <NoktaAvatar3D state={avatarState} />
+              <NoktaAvatar state={avatarState} />
             )}
           </View>
         </View>
@@ -683,6 +684,7 @@ function MicrophoneIcon() {
 
 function getAvatarState({
   activeEscalation,
+  pendingExpertOffer,
   busy,
   conversationLocked,
   error,
@@ -690,6 +692,7 @@ function getAvatarState({
   speaking,
 }: {
   activeEscalation: EscalationRequest | null;
+  pendingExpertOffer: { question: string; topic: string } | null;
   busy: boolean;
   conversationLocked: boolean;
   error: string | null;
@@ -698,6 +701,10 @@ function getAvatarState({
 }): MascotVisualState {
   if (error) {
     return 'error';
+  }
+
+  if (activeEscalation || pendingExpertOffer) {
+    return 'sweat';
   }
 
   if (listening) {
@@ -774,7 +781,7 @@ function getStatusText({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#eef2ff',
+    backgroundColor: '#FDF8EC',
   },
   keyboard: {
     flex: 1,
@@ -1043,16 +1050,16 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   message: {
-    borderRadius: 18,
+    borderRadius: 24,
     gap: 5,
     maxWidth: '86%',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#2563eb',
-    borderBottomRightRadius: 5,
+    backgroundColor: '#D6E4FF',
+    borderBottomRightRadius: 8,
   },
   botMessage: {
     alignSelf: 'flex-start',
@@ -1071,8 +1078,8 @@ const styles = StyleSheet.create({
   },
   messageText: {
     color: '#1f2937',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   typing: {
     alignSelf: 'flex-start',
@@ -1121,14 +1128,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     backgroundColor: '#ffffff',
     borderColor: '#e5e7eb',
-    borderRadius: 24,
+    borderRadius: 32,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
-    paddingBottom: 6,
-    paddingLeft: 14,
-    paddingRight: 6,
-    paddingTop: 6,
+    gap: 12,
+    paddingBottom: 8,
+    paddingLeft: 20,
+    paddingRight: 8,
+    paddingTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   hiddenInputWrap: {
     display: 'none',
@@ -1155,15 +1167,19 @@ const styles = StyleSheet.create({
   },
   composerMicButton: {
     alignItems: 'center',
-    backgroundColor: '#0044cc',
-    borderRadius: 18,
-    height: 38,
+    backgroundColor: '#FDE68A',
+    borderRadius: 28,
+    height: 56,
+    width: 56,
     justifyContent: 'center',
-    minWidth: 48,
-    paddingHorizontal: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   composerMicButtonActive: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#FCA5A5',
   },
   composerMicButtonText: {
     color: '#ffffff',
@@ -1181,7 +1197,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 9,
     borderBottomRightRadius: 9,
     borderBottomWidth: 2,
-    borderColor: '#ffffff',
+    borderColor: '#4B5563',
     borderLeftWidth: 2,
     borderRightWidth: 2,
     height: 12,
@@ -1191,7 +1207,7 @@ const styles = StyleSheet.create({
   },
   micHead: {
     backgroundColor: 'transparent',
-    borderColor: '#ffffff',
+    borderColor: '#4B5563',
     borderRadius: 7,
     borderWidth: 2,
     height: 15,
@@ -1200,7 +1216,7 @@ const styles = StyleSheet.create({
     width: 10,
   },
   micStem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#4B5563',
     borderRadius: 1,
     height: 4,
     position: 'absolute',
@@ -1208,7 +1224,7 @@ const styles = StyleSheet.create({
     width: 2,
   },
   micBase: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#4B5563',
     borderRadius: 1,
     bottom: 0,
     height: 2,
