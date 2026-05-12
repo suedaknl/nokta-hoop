@@ -38,7 +38,7 @@ export function NoktaAvatar({ state }: { state: MascotVisualState }) {
   return (
     <View style={styles.container}>
       {/* Kamerayı tam ortaladık ki sohbet kapalıyken ekranı doldursun */}
-      <Canvas camera={{ position: [0, -0.2, 6.5], fov: 45 }} style={styles.canvas}>
+      <Canvas camera={{ position: [0, 0, 5.2], fov: 45 }} style={styles.canvas}>
         <color args={['#fafaf9']} attach="background" />
         <ambientLight intensity={1.2} />
         <directionalLight intensity={1.5} position={[5, 10, 5]} color="#ffffff" />

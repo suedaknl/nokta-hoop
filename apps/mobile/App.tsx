@@ -773,7 +773,7 @@ function AppContent() {
     const joined = await videoCall.join({
       callId: request.callId,
       callType: request.callType,
-      mediaMode: role,
+      mediaMode: 'mentor',
     });
 
     if (!joined) {

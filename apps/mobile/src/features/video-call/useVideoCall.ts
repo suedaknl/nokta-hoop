@@ -163,13 +163,13 @@ export function useVideoCall() {
       await withTimeout(
         joinStreamCall(nextCall, {
           callType: targetCallType,
-          mediaMode: input.mediaMode ?? 'default',
+          mediaMode: 'mentor',
         }),
         CALL_JOIN_TIMEOUT_MS,
         'Stream call join timed out. Check internet access, Stream app settings, and Metro logs.',
       );
 
-      await configureCallMedia(nextCall, input.mediaMode ?? 'default');
+      await configureCallMedia(nextCall, 'mentor');
       await startLivestreamIfNeeded(
         nextCall,
         targetCallType,
@@ -535,11 +535,17 @@ async function joinStreamCall(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      // join içine sadece create: true kalmalı
       await targetCall.join({
         create: true,
-        video: input.mediaMode === 'mentor',
       });
+
+      // Video ve ses ayarlarını join'den sonra dışarıda yapıyoruz
+      await targetCall.camera.enable();
+      await targetCall.microphone.enable();
+
       return;
+      // ... catch bloğunun geri kalanı aynı kalsın
     } catch (error) {
       if (
         !shouldRetryBackstage ||
@@ -548,12 +554,10 @@ async function joinStreamCall(
       ) {
         throw error;
       }
-
       await delay(1500);
     }
   }
 }
-
 function isLivestreamBackstageJoinError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes('JoinBackstage') || message.includes('backstage');

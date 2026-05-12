@@ -1,35 +1,93 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { type StyleProp, type ViewStyle, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
-  ReactionsButton,
-  ToggleAudioPublishingButton,
-  ToggleCameraFaceButton,
-  ToggleVideoPublishingButton,
+  useCall,
+  useCallStateHooks,
 } from '@stream-io/video-react-native-sdk';
 
 type VideoCallControlsProps = {
   onHangupCallHandler: () => Promise<void> | void;
+  style?: StyleProp<ViewStyle>;
 };
 
 export function VideoCallControls({
   onHangupCallHandler,
+  style,
 }: VideoCallControlsProps) {
+  const call = useCall();
+  const { useMicrophoneState, useCameraState } = useCallStateHooks();
+  // isMuted yerine isMute kullanıyoruz (Hata mesajında doğrusu yazıyor)
+  const { isMute: isMicMuted } = useMicrophoneState();
+  const { isMute: isCamMuted } = useCameraState();
+
+  // Mikrofonu Aç/Kapat
+  const toggleMic = async () => {
+    if (!call) return;
+    try {
+      if (isMicMuted) {
+        await call.microphone.enable();
+      } else {
+        await call.microphone.disable();
+      }
+    } catch (e) {
+      console.warn('Mikrofon hatası:', e);
+    }
+  };
+
+  // Kamerayı Aç/Kapat
+  const toggleCam = async () => {
+    if (!call) return;
+    try {
+      if (isCamMuted) {
+        await call.camera.enable();
+      } else {
+        await call.camera.disable();
+      }
+    } catch (e) {
+      console.warn('Kamera hatası:', e);
+    }
+  };
+
+  const flipCam = async () => {
+    if (!call) return;
+    try {
+      await call.camera.flip();
+    } catch (e) {
+      console.warn('Kamera çevirme hatası:', e);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <ToggleVideoPublishingButton />
-      <ToggleAudioPublishingButton />
-      <ToggleCameraFaceButton />
-      <ReactionsButton />
-      <Pressable
-        accessibilityLabel="Görüşmeyi bitir"
-        accessibilityRole="button"
-        onPress={() => void onHangupCallHandler()}
-        style={({ pressed }) => [
-          styles.endButton,
-          pressed ? styles.endButtonPressed : null,
-        ]}
-      >
-        <Text style={styles.endButtonText}>Bitir</Text>
-      </Pressable>
+    <View pointerEvents="box-none" style={[styles.container, style]}>
+      <View style={styles.controlsRow}>
+        <Pressable
+          onPress={toggleCam}
+          style={[styles.controlBtn, isCamMuted ? styles.mutedBtn : styles.activeBtn]}
+        >
+          <Text style={styles.btnText}>{isCamMuted ? '📷 Kapalı' : '📷 Açık'}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={toggleMic}
+          style={[styles.controlBtn, isMicMuted ? styles.mutedBtn : styles.activeBtn]}
+        >
+          <Text style={styles.btnText}>{isMicMuted ? '🎤 Kapalı' : '🎤 Açık'}</Text>
+        </Pressable>
+
+        <Pressable onPress={flipCam} style={styles.controlBtn}>
+          <Text style={styles.btnText}>🔄</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => onHangupCallHandler()}
+          style={({ pressed }) => [
+            styles.endButton,
+            pressed && styles.endButtonPressed,
+          ]}
+        >
+          <Text style={styles.endButtonText}>Bitir</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -37,35 +95,62 @@ export function VideoCallControls({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 24,
-    minHeight: 68,
-    borderRadius: 16,
+    left: 0,
+    right: 0,
+    bottom: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+  },
+  controlsRow: {
+    flexDirection: 'row',
     backgroundColor: '#075985',
+    borderRadius: 30,
+    padding: 12,
+    alignItems: 'center',
+    gap: 12,
+    elevation: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  controlBtn: {
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#38bdf8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+  },
+  activeBtn: {
+    backgroundColor: '#0c4a6e',
+  },
+  mutedBtn: {
+    backgroundColor: '#dc2626',
+    borderColor: '#ef4444',
+  },
+  btnText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   endButton: {
-    alignItems: 'center',
-    backgroundColor: '#dc2626',
-    borderRadius: 999,
-    height: 42,
+    backgroundColor: '#ffffff',
+    borderRadius: 25,
+    height: 50,
+    paddingHorizontal: 20,
     justifyContent: 'center',
-    minWidth: 58,
-    paddingHorizontal: 12,
+    alignItems: 'center',
   },
   endButtonPressed: {
-    opacity: 0.8,
+    opacity: 0.7,
   },
   endButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '900',
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
