@@ -7,6 +7,15 @@ entries below are rebuilt from the current git commit history.
 
 ## [Unreleased]
 
+### Added
+- Added a Multi-LLM Fallback Chain for Mascot decision logic (Groq -> OpenAI -> Gemini).
+- Added `OPENAI_API_KEY` and `GEMINI_API_KEY` support to the token-server.
+- Added a `.env.example` file to `services/token-server` for easier configuration.
+
+### Changed
+- Refactored Mascot decision engine to handle timeouts and errors across multiple
+  AI providers before falling back to deterministic rules.
+
 ## [nokta-hoop 0.5.0] - 2026-05-08
 
 ### Added

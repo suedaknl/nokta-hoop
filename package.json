@@ -27,5 +27,10 @@
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.6.1",
+    "react-native-svg": "15.12.1",
+    "three": "^0.184.0"
   }
 }

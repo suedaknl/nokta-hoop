@@ -10,13 +10,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@nokta-hoop/hoop-call": "file:../../packages/hoop-call",
     "@nokta-hoop/hoop-core": "file:../../packages/hoop-core",
     "@stream-io/node-sdk": "^0.7.28",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
-    "groq-sdk": "^1.1.2"
+    "groq-sdk": "^1.1.2",
+    "openai": "^6.37.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

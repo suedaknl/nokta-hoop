@@ -137,9 +137,9 @@ const corsOrigins =
   allowedOrigins === '*' || allowedOrigins.trim() === ''
     ? true
     : allowedOrigins
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean);
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
 
 app.use(cors({ origin: corsOrigins, methods: ['GET', 'POST'], maxAge: 86400 }));
 app.use(express.json());
@@ -840,13 +840,19 @@ async function prepareAcceptedEscalationCall(
 
   try {
     const call = getStreamVideoCall(request.callType, request.callId);
-    await call.getOrCreate?.();
+
+    // @ts-ignore
+    await call.getOrCreate?.({
+      data: {
+        created_by_id: 'mentor_sueda'
+      }
+    });
+
     await call.goLive?.();
   } catch (error) {
     console.warn('prepare accepted escalation livestream failed:', error);
   }
 }
-
 function getTranscriptionLanguage(body: unknown): string {
   if (
     body &&

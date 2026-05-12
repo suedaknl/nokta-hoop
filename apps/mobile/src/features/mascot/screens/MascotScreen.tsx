@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -145,11 +146,17 @@ export function MascotScreen({
       return;
     }
 
-    const scrollTimer = setTimeout(() => {
+    const scrollToBottom = () => {
       chatRef.current?.scrollToEnd({ animated: true });
-    }, 50);
+    };
 
-    return () => clearTimeout(scrollTimer);
+    const scrollTimer = setTimeout(scrollToBottom, 50);
+    const keyboardShowListener = Keyboard.addListener('keyboardDidShow', scrollToBottom);
+
+    return () => {
+      clearTimeout(scrollTimer);
+      keyboardShowListener.remove();
+    };
   }, [busy, messages, showChat]);
 
   useSpeechRecognitionEvent('start', () => {
@@ -340,7 +347,7 @@ export function MascotScreen({
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboard}
       >
         {shouldShowEscalationNotice || conversationLocked ? (
@@ -589,50 +596,6 @@ export function MascotScreen({
           </View>
 
           {renderComposer()}
-          <View style={styles.hiddenInputWrap}>
-            <TextInput
-              editable={!busy && !conversationLocked}
-              multiline
-              onChangeText={setDraft}
-              placeholder={
-                conversationLocked ? 'Transkript hazırlanıyor...' : 'Fikrini yaz...'
-              }
-              placeholderTextColor="#9ca3af"
-              style={styles.input}
-              value={draft}
-            />
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy || conversationLocked}
-              onPress={() => void toggleListening()}
-              style={({ pressed }) => [
-                styles.composerMicButton,
-                listening ? styles.composerMicButtonActive : null,
-                busy || conversationLocked ? styles.disabledButton : null,
-                pressed && !busy && !conversationLocked ? styles.buttonPressed : null,
-              ]}
-            >
-              <Text style={styles.composerMicButtonText}>
-                {listening ? 'Dur' : 'Mikrofon'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy || conversationLocked || draft.trim().length === 0}
-              onPress={() => void submit()}
-              style={({ pressed }) => [
-                styles.sendButton,
-                busy || conversationLocked || draft.trim().length === 0
-                  ? styles.disabledButton
-                  : null,
-                pressed && !busy && !conversationLocked
-                  ? styles.buttonPressed
-                  : null,
-              ]}
-            >
-              <Text style={styles.sendButtonText}>Gönder</Text>
-            </Pressable>
-          </View>
         </View>
 
         {!showChat ? (
@@ -654,7 +617,6 @@ export function MascotScreen({
     </SafeAreaView>
   );
 }
-
 function suspendMentorViewerAudio() {
   try {
     callManager.stop();
@@ -1046,6 +1008,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chatBody: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
     gap: 10,
     paddingBottom: 10,
   },
